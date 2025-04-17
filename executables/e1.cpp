@@ -41,18 +41,22 @@ int main() {
                               glm::vec3(0, 1, 0));
   program = r.createShaderProgram(r.vsBlinnPhong(), r.fsBlinnPhong());
 
-  root = addJoint(r, nullptr, glm::vec3(0.0f), glm::vec3(0, 0, 1),
+  // maybe the distance in y cordainte is distance from centre ofprevious to
+  // start ofnew one ofc, thats why 0.5f
+  root = addJoint(r, nullptr, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0, 0, 1),
                   joints); // shoulder (fixed)
   Bone *forearm = addJoint(r, root, glm::vec3(0.0f, 0.5f, 0.0f),
                            glm::vec3(0, 0, 1), joints); // elbow
+  Bone *hand = addJoint(r, forearm, glm::vec3(0.0f, 0.5f, 0.0f),
+                        glm::vec3(0, 0, 1), joints); // elbow
 
   keyframeTimes = {0.0f, 1.0f, 2.0f, 3.0f};
 
   keyframes = {
-      {0.0f, 0.25f}, // frame 1: straight arm
-      {0.0f, 0.5f},  // frame 2: elbow bent
-      {0.0f, -0.5f}, // frame 3: elbow bent other way
-      {0.0f, 0.0f}   // frame 4: back to straight
+      {0.0f, 0.25f, 0.0f}, // frame 1: straight arm
+      {0.0f, 0.5f, -0.5f}, // frame 2: elbow bent
+      {0.0f, -0.5f, 0.5f}, // frame 3: elbow bent other way
+      {0.0f, 0.0f, 0.25f}  // frame 4: back to straight
   };
 
   while (!r.shouldQuit()) {
