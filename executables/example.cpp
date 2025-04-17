@@ -9,11 +9,11 @@ using namespace glm;
 GL::Rasterizer r;
 GL::ShaderProgram program;
 
-const int nv = 4;
-const int nt = 2;
+const int nv = 4, nt = 2, ne = 4;
 vec3 vertices[nv];
 vec3 normals[nv];
 ivec3 triangles[nt];
+ivec2 edges[ne];
 
 GL::Object object;
 GL::AttribBuf vertexBuf, normalBuf;
@@ -35,6 +35,11 @@ void initializeScene() {
 	triangles[0] = ivec3(0, 1, 2);
 	triangles[1] = ivec3(0, 2, 3);
 	r.createTriangleIndices(object, nt, triangles);
+    edges[0] = ivec2(0, 1);
+    edges[1] = ivec2(1, 2);
+    edges[2] = ivec2(2, 3);
+    edges[3] = ivec2(3, 0);
+	r.createEdgeIndices(object, ne, edges);
 }
 
 void updateScene(float t) {
@@ -72,7 +77,7 @@ int main() {
 		camCtl.update();
 		Camera &camera = camCtl.camera;
 
-		r.clear(vec4(1.0, 1.0, 1.0, 1.0));
+		r.clear(vec4(0.4, 0.4, 0.4, 1.0));
 		r.enableDepthTest();
 		r.useShaderProgram(program);
 
@@ -86,19 +91,21 @@ int main() {
 		r.setupFilledFaces();
         glm::vec3 orange(1.0f, 0.6f, 0.2f);
         glm::vec3 white(1.0f, 1.0f, 1.0f);
-        r.setUniform(program, "ambientColor", 0.4f*orange);
-        r.setUniform(program, "diffuseColor", 0.9f*orange);
-        r.setUniform(program, "specularColor", 0.8f*white);
-        r.setUniform(program, "phongExponent", 100.f);
-		r.drawObject(object);
+        r.setUniform(program, "ambientColor", 0.2f*white);
+        r.setUniform(program, "extdiffuseColor", 0.9f*orange);
+        r.setUniform(program, "intdiffuseColor", 0.4f*orange);
+        r.setUniform(program, "specularColor", 0.6f*white);
+        r.setUniform(program, "phongExponent", 20.f);
+		r.drawTriangles(object);
 
 		r.setupWireFrame();
         glm::vec3 black(0.0f, 0.0f, 0.0f);
         r.setUniform(program, "ambientColor", black);
-        r.setUniform(program, "diffuseColor", black);
+        r.setUniform(program, "extdiffuseColor", black);
+        r.setUniform(program, "intdiffuseColor", black);
         r.setUniform(program, "specularColor", black);
         r.setUniform(program, "phongExponent", 0.f);
-		r.drawObject(object);
+		r.drawEdges(object);
 
 		r.show();
 	}

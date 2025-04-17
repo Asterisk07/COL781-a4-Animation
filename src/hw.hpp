@@ -15,8 +15,9 @@ namespace COL781 {
 		using ShaderProgram = GLuint;
 
 		struct Object {
-			GLuint vao;
+			GLuint tri_vao, edge_vao;
 			int nTris;
+			int nEdges;
 		};
 
 		using AttribBuf = GLuint;
@@ -66,6 +67,9 @@ namespace COL781 {
 			// Creates a buffer for the indices of the triangles.
 			IndexBuf createTriangleIndices(Object &object, int n, const glm::ivec3* indices);
 
+			// Creates a buffer for the indices of the edges.
+			IndexBuf createEdgeIndices(Object &object, int n, const glm::ivec2* indices);
+
 			/** Drawing **/
 
 			// Enable depth testing.
@@ -75,7 +79,10 @@ namespace COL781 {
 			void clear(glm::vec4 color);
 
 			// Draws the triangles of the given object.
-			void drawObject(const Object &object);
+			void drawTriangles(const Object &object);
+
+			// Draws the edges of the given object.
+			void drawEdges(const Object &object);
 
 			// Draws only the edges of the polygon mesh. Note that it offsets the edges to avoid z-buffer fighting.
 			void setupWireFrame();
@@ -90,11 +97,11 @@ namespace COL781 {
 
 			/** Built-in shaders **/
 
-            // A vertex shader that supports the Blinn-Phong shading model.
-            VertexShader vsBlinnPhong();
+			// A vertex shader that supports the Blinn-Phong shading model.
+			VertexShader vsBlinnPhong();
 
-            // A fragment shader that supports the Blinn-Phong shading model.
-            FragmentShader fsBlinnPhong();
+			// A fragment shader that supports the Blinn-Phong shading model.
+			FragmentShader fsBlinnPhong();
 
 		private:
 			SDL_Window *window;

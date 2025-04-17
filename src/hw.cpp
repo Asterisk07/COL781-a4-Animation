@@ -155,7 +155,8 @@ namespace COL781 {
 
 		Object Rasterizer::createObject() {
 			Object object;
-			glGenVertexArrays(1, &object.vao);
+			glGenVertexArrays(1, &object.tri_vao);
+			glGenVertexArrays(1, &object.edge_vao);
 			glCheckError();
 			return object;
 		}
@@ -163,11 +164,17 @@ namespace COL781 {
 		template <typename T> AttribBuf Rasterizer::createVertexAttribs(Object &object, int attribIndex, int n, const T *data) {
 			GLuint vbo;
 			glGenBuffers(1, &vbo);
-			glBindVertexArray(object.vao);
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
 			glBufferData(GL_ARRAY_BUFFER, n*sizeof(T), (float*)data, GL_STATIC_DRAW);
-			glVertexAttribPointer(attribIndex, sizeof(T)/sizeof(float), GL_FLOAT, GL_FALSE, sizeof(T), NULL);
+			glBindVertexArray(object.tri_vao);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
 			glEnableVertexAttribArray(attribIndex);
+			glVertexAttribPointer(attribIndex, sizeof(T)/sizeof(float), GL_FLOAT, GL_FALSE, sizeof(T), NULL);
+			glBindVertexArray(object.edge_vao);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glEnableVertexAttribArray(attribIndex);
+			glVertexAttribPointer(attribIndex, sizeof(T)/sizeof(float), GL_FLOAT, GL_FALSE, sizeof(T), NULL);
+            glBindVertexArray(0);
 			glCheckError();
 			return vbo;
 		}
@@ -189,10 +196,21 @@ namespace COL781 {
 		IndexBuf Rasterizer::createTriangleIndices(Object &object, int n, const glm::ivec3* indices) {
 			GLuint ebo;
 			glGenBuffers(1, &ebo);
-			glBindVertexArray(object.vao);
+			glBindVertexArray(object.tri_vao);
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3*n*sizeof(int), (float*)indices, GL_STATIC_DRAW);
 			object.nTris = n;
+			glCheckError();
+			return ebo;
+		}
+
+		IndexBuf Rasterizer::createEdgeIndices(Object &object, int n, const glm::ivec2* indices) {
+			GLuint ebo;
+			glGenBuffers(1, &ebo);
+			glBindVertexArray(object.edge_vao);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, 2*n*sizeof(int), (float*)indices, GL_STATIC_DRAW);
+			object.nEdges = n;
 			glCheckError();
 			return ebo;
 		}
@@ -209,9 +227,17 @@ namespace COL781 {
 			glCheckError();
 		}
 
-		void Rasterizer::drawObject(const Object &object) {
-			glBindVertexArray(object.vao);
+		void Rasterizer::drawTriangles(const Object &object) {
+			glEnable(GL_POLYGON_OFFSET_FILL);
+			glPolygonOffset(1.f, 1.f);
+			glBindVertexArray(object.tri_vao);
 			glDrawElements(GL_TRIANGLES, 3*object.nTris, GL_UNSIGNED_INT, 0);
+			glCheckError();
+		}
+
+		void Rasterizer::drawEdges(const Object &object) {
+			glBindVertexArray(object.edge_vao);
+			glDrawElements(GL_LINES, 2*object.nEdges, GL_UNSIGNED_INT, 0);
 			glCheckError();
 		}
 
@@ -220,9 +246,10 @@ namespace COL781 {
 		}
 
 		void Rasterizer::setupWireFrame() {
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-			glEnable(GL_POLYGON_OFFSET_LINE);
-			glPolygonOffset(-1.f, -1.f);
+			// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			// glEnable(GL_POLYGON_OFFSET_LINE);
+			// glPolygonOffset(10.f, 10.f);
+			glLineWidth(2.5f);
 		}
 
 		void Rasterizer::show() {
@@ -281,21 +308,30 @@ namespace COL781 {
                 "out vec4 fColor;\n"
                 "uniform vec3 lightPos, viewPos;\n"
                 "uniform vec3 lightColor;\n"
-                "uniform vec3 ambientColor, diffuseColor, specularColor;\n"
+                "uniform vec3 ambientColor, specularColor;\n"
+                "uniform vec3 intdiffuseColor, extdiffuseColor;\n"
                 "uniform float phongExponent;\n"
                 "void main() {\n"
-                "vec3 I = pow(lightColor, vec3(2.2));\n"
-                "vec3 ka = pow(ambientColor, vec3(2.2));\n"
-                "vec3 kd = pow(diffuseColor, vec3(2.2));\n"
-                "vec3 n = normalize(Normal);\n"
-                "vec3 l = normalize(lightPos - FragPos);\n"
-                "vec3 diffuse = I * kd * max(dot(n, l), 0.0);\n"
-                "vec3 ks = pow(specularColor, vec3(2.2))\n;"
-                "vec3 v = normalize(viewPos - FragPos);\n"
-                "vec3 h = normalize(v + l);\n"
-                "vec3 specular = I * ks * pow(max(dot(n, h), 0.0), phongExponent);\n"
-                "vec3 result = pow(ka + diffuse + specular, vec3(1./2.2)); \n"
-                "fColor = vec4(result, 1.0);\n"
+                    "vec3 I = pow(lightColor, vec3(2.2));\n"
+                    "vec3 ka = pow(ambientColor, vec3(2.2));\n"
+                    "vec3 diffuseColor = gl_FrontFacing ? extdiffuseColor : intdiffuseColor;\n"
+                    "vec3 kd = pow(diffuseColor, vec3(2.2));\n"
+                    "vec3 n = normalize(Normal);\n"
+                    "n = gl_FrontFacing ? n : -n;\n"
+                    "vec3 result = vec3(0.0, 0.0, 0.0);\n" 
+                    "if(length(n) > 0.1) {\n"
+                        "vec3 l = normalize(lightPos - FragPos);\n"
+                        "vec3 diffuse = I * kd * max(dot(n, l), 0.0);\n"
+                        "vec3 ks = pow(specularColor, vec3(2.2))\n;"
+                        "vec3 v = normalize(viewPos - FragPos);\n"
+                        "vec3 h = normalize(v + l);\n"
+                        "vec3 specular = I * ks * pow(max(dot(n, h), 0.0), phongExponent);\n"
+                        "result = pow(ka + diffuse + specular, vec3(1./2.2)); \n"
+                    "}\n"
+                    "else {\n"
+                        "result = pow(ka, vec3(1./2.2));\n"
+                    "}\n"
+                    "fColor = vec4(result, 1.0);\n"
                 "}\n";
             return createShader(GL_FRAGMENT_SHADER, source);
         }

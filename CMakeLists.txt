@@ -11,5 +11,6 @@ add_library(col781 src/hw.cpp src/camera.cpp deps/src/gl.c)
 target_include_directories(col781 PUBLIC deps/include)
 target_link_libraries(col781 glm::glm OpenGL::GL SDL2::SDL2)
 
-add_executable(animation src/animation.cpp)
-target_link_libraries(animation col781)
+add_executable(example executables/example.cpp)
+target_include_directories(example PUBLIC src)
+target_link_libraries(example col781)
