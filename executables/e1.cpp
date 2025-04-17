@@ -10,9 +10,26 @@ GL::Rasterizer r;
 GL::ShaderProgram program;
 CameraControl camCtl;
 
-// Pointers to your bones
 Bone *root = nullptr;
-std::vector<Bone *> allBones;
+std::vector<Joint> joints;
+std::vector<std::vector<float>> keyframes;
+std::vector<float> keyframeTimes;
+
+// Catmull-Rom interpolation with unequal spacing
+float catmullRom(float p0, float p1, float p2, float p3, float t, float dt1,
+                 float dt2, float dt3) {
+  float t1 =
+      ((p2 - p0) / (dt1 + dt2) - (p1 - p0) / dt1) * dt2 + (p2 - p1) / dt2;
+  float t2 =
+      ((p3 - p1) / (dt2 + dt3) - (p2 - p1) / dt2) * dt2 + (p2 - p1) / dt2;
+
+  float a = 2 * (p1 - p2) + t1 + t2;
+  float b = -3 * (p1 - p2) - 2 * t1 - t2;
+  float c = t1;
+  float d = p1;
+
+  return a * t * t * t + b * t * t + c * t + d;
+}
 
 int main() {
   int width = 640, height = 480;
@@ -24,40 +41,51 @@ int main() {
                               glm::vec3(0, 1, 0));
   program = r.createShaderProgram(r.vsBlinnPhong(), r.fsBlinnPhong());
 
-  // ✨ BUILD BONE HIERARCHY: 1 → 2 → 2 each
-  root = createBone(r, nullptr, glm::vec3(0.0f), glm::vec3(0, 0, 1));
-  allBones.push_back(root);
+  root = addJoint(r, nullptr, glm::vec3(0.0f), glm::vec3(0, 0, 1),
+                  joints); // shoulder (fixed)
+  Bone *forearm = addJoint(r, root, glm::vec3(0.0f, 0.5f, 0.0f),
+                           glm::vec3(0, 0, 1), joints); // elbow
 
-  Bone *left =
-      createBone(r, root, glm::vec3(-0.3f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  Bone *right =
-      createBone(r, root, glm::vec3(0.3f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  allBones.push_back(left);
-  allBones.push_back(right);
+  keyframeTimes = {0.0f, 1.0f, 2.0f, 3.0f};
 
-  Bone *l1 =
-      createBone(r, left, glm::vec3(-0.1f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  Bone *l2 =
-      createBone(r, left, glm::vec3(0.1f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  Bone *r1 =
-      createBone(r, right, glm::vec3(-0.1f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  Bone *r2 =
-      createBone(r, right, glm::vec3(0.1f, 1.0f, 0.0f), glm::vec3(0, 0, 1));
-  allBones.insert(allBones.end(), {l1, l2, r1, r2});
+  keyframes = {
+      {0.0f, 0.25f}, // frame 1: straight arm
+      {0.0f, 0.5f},  // frame 2: elbow bent
+      {0.0f, -0.5f}, // frame 3: elbow bent other way
+      {0.0f, 0.0f}   // frame 4: back to straight
+  };
 
   while (!r.shouldQuit()) {
     float t = SDL_GetTicks64() * 1e-3f;
+    float T = fmod(t, keyframeTimes.back());
 
-    // ✨ Animate bones (e.g. simple sinusoidal waving)
-    root->hinge_angle = 0.0f;
-    left->hinge_angle = 0.5f * sin(t);
-    right->hinge_angle = -0.5f * sin(t);
-    l1->hinge_angle = 0.5f * cos(2 * t);
-    l2->hinge_angle = -0.3f * cos(1.5f * t);
-    r1->hinge_angle = 0.5f * cos(2 * t + 1.0f);
-    r2->hinge_angle = -0.3f * cos(1.5f * t + 0.5f);
+    // 🔍 Find keyframe interval [k1, k2]
+    int k = 0;
+    while (k < keyframeTimes.size() - 1 && T >= keyframeTimes[k + 1])
+      k++;
 
-    updateBoneTransforms(root);
+    int k0 = std::max(0, k - 1);
+    int k1 = k;
+    int k2 = std::min((int)keyframeTimes.size() - 1, k + 1);
+    int k3 = std::min((int)keyframeTimes.size() - 1, k + 2);
+
+    float t0 = keyframeTimes[k0];
+    float t1 = keyframeTimes[k1];
+    float t2 = keyframeTimes[k2];
+    float t3 = keyframeTimes[k3];
+
+    float u = (T - t1) / (t2 - t1); // normalize t between k1 and k2
+
+    for (int i = 0; i < joints.size(); ++i) {
+      float a0 = keyframes[k0][i];
+      float a1 = keyframes[k1][i];
+      float a2 = keyframes[k2][i];
+      float a3 = keyframes[k3][i];
+      float angle = catmullRom(a0, a1, a2, a3, u, t1 - t0, t2 - t1, t3 - t2);
+      setTheta(joints[i], angle);
+    }
+
+    updateJointHierarchy(root);
     updateAllMeshes(r, root);
 
     camCtl.update();
@@ -80,7 +108,7 @@ int main() {
     r.setUniform(program, "specularColor", 0.6f * glm::vec3(1));
     r.setUniform(program, "phongExponent", 20.0f);
 
-    // ✨ draw all bones recursively
+    // 🦴 Draw recursively
     std::function<void(Bone *)> drawRecursive = [&](Bone *bone) {
       r.setUniform(program, "model", bone->world_transform);
       r.drawTriangles(bone->object);

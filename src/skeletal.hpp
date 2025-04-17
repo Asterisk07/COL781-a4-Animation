@@ -33,6 +33,17 @@ struct Bone {
   GL::AttribBuf vertexBuf, normalBuf;
 };
 
+struct Joint {
+  Bone *bone;
+  float theta; // editable angle
+};
+
+Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
+               glm::vec3 axis, std::vector<Joint> &jointList);
+
+// Optional helper
+void setTheta(Joint &joint, float theta);
+void updateJointHierarchy(Bone *root);
 // Character state
 // std::vector<Bone> bones;
 // Bone *root;

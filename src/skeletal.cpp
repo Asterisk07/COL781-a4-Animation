@@ -20,35 +20,65 @@ void createBoxMesh(std::vector<glm::vec3> &vertices,
   normals = {normal, normal, normal, normal};
 }
 // 2. Builder Function: createBone
+// Inside skeletal.cpp
 Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
                  glm::vec3 axis) {
-  Bone *bone = new Bone();
-  bone->parent = parent;
-  bone->joint_pos = joint_pos;
-  bone->axis = axis;
-
+  Bone *b = new Bone();
+  b->parent = parent;
+  b->joint_pos = joint_pos;
+  b->axis = axis;
   if (parent)
-    parent->children.push_back(bone);
+    parent->children.push_back(b);
 
   std::vector<glm::vec3> verts, norms;
   std::vector<glm::ivec3> tris;
-  createBoxMesh(verts, norms, tris);
+  createBoxMesh(verts, norms, tris); // mesh created
 
-  bone->mesh_vertices_local = verts;
-  bone->mesh_normals_local = norms;
+  b->mesh_vertices_local = verts;
+  b->mesh_normals_local = norms;
 
-  bone->object = r.createObject();
-  bone->vertexBuf =
-      r.createVertexAttribs(bone->object, 0, verts.size(), verts.data());
-  bone->normalBuf =
-      r.createVertexAttribs(bone->object, 1, norms.size(), norms.data());
-  r.createTriangleIndices(bone->object, tris.size(), tris.data());
+  b->object = r.createObject();
+  b->vertexBuf =
+      r.createVertexAttribs(b->object, 0, verts.size(), verts.data());
+  b->normalBuf =
+      r.createVertexAttribs(b->object, 1, norms.size(), norms.data());
+  r.createTriangleIndices(b->object, tris.size(), tris.data());
 
   std::vector<glm::ivec2> edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
-  r.createEdgeIndices(bone->object, edges.size(), edges.data());
+  r.createEdgeIndices(b->object, edges.size(), edges.data());
 
-  return bone;
+  return b;
 }
+
+// Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
+//                  glm::vec3 axis) {
+//   Bone *bone = new Bone();
+//   bone->parent = parent;
+//   bone->joint_pos = joint_pos;
+//   bone->axis = axis;
+
+//   if (parent)
+//     parent->children.push_back(bone);
+
+//   std::vector<glm::vec3> verts, norms;
+//   std::vector<glm::ivec3> tris;
+//   createBoxMesh(verts, norms, tris);
+
+//   bone->mesh_vertices_local = verts;
+//   bone->mesh_normals_local = norms;
+
+//   bone->object = r.createObject();
+//   bone->vertexBuf =
+//       r.createVertexAttribs(bone->object, 0, verts.size(), verts.data());
+//   bone->normalBuf =
+//       r.createVertexAttribs(bone->object, 1, norms.size(), norms.data());
+//   r.createTriangleIndices(bone->object, tris.size(), tris.data());
+
+//   std::vector<glm::ivec2> edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
+//   r.createEdgeIndices(bone->object, edges.size(), edges.data());
+
+//   return bone;
+// }
 
 // void initialize(GL::Rasterizer &r) {
 //   // Create skeleton (torso → upper arm → forearm, etc.)
@@ -128,3 +158,16 @@ void updateAllMeshes(GL::Rasterizer &r, Bone *root) {
 }
 
 // } // namespace Skeleton
+Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
+               glm::vec3 axis, std::vector<Joint> &jointList) {
+  Bone *b = createBone(r, parent, joint_pos, axis);
+  jointList.push_back({b, 0.0f});
+  return b;
+}
+
+void setTheta(Joint &joint, float theta) {
+  joint.theta = theta;
+  joint.bone->hinge_angle = theta;
+}
+
+void updateJointHierarchy(Bone *root) { updateBoneTransforms(root); }
