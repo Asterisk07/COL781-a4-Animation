@@ -41,23 +41,29 @@ int main() {
                               glm::vec3(0, 1, 0));
   program = r.createShaderProgram(r.vsBlinnPhong(), r.fsBlinnPhong());
 
+  /*---- START OF USER INPUT ----*/
   // maybe the distance in y cordainte is distance from centre ofprevious to
   // start ofnew one ofc, thats why 0.5f
-  root = addJoint(r, nullptr, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0, 0, 1),
-                  joints); // shoulder (fixed)
+  // Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
+  //   glm::vec3 axis, std::vector<Joint> &jointList, float length,
+  //   float width, float depth)
+  float l = 0.8f, b = 0.2f, h = 0.2f;
+  root = addJoint(r, nullptr, glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(1, 0, 0),
+                  joints, 1.0f, b, 1.0f); // shoulder (fixed)
   Bone *forearm = addJoint(r, root, glm::vec3(0.0f, 0.5f, 0.0f),
-                           glm::vec3(0, 0, 1), joints); // elbow
+                           glm::vec3(1, 0, 0), joints, l, b, h); // elbow
   Bone *hand = addJoint(r, forearm, glm::vec3(0.0f, 0.5f, 0.0f),
-                        glm::vec3(0, 0, 1), joints); // elbow
+                        glm::vec3(1, 0, 0), joints, l, b, h); // elbow
 
   keyframeTimes = {0.0f, 1.0f, 2.0f, 3.0f};
 
   keyframes = {
       {0.0f, 0.25f, 0.0f}, // frame 1: straight arm
-      {0.0f, 0.5f, -0.5f}, // frame 2: elbow bent
-      {0.0f, -0.5f, 0.5f}, // frame 3: elbow bent other way
-      {0.0f, 0.0f, 0.25f}  // frame 4: back to straight
+      {0.0f, 0.5f, -0.0f}, // frame 2: elbow bent
+      {0.0f, -0.5f, 0.0f}, // frame 3: elbow bent other way
+      {0.0f, 0.0f, 0.0f}   // frame 4: back to straight
   };
+  /*---- END OF USER INPUT ----*/
 
   while (!r.shouldQuit()) {
     float t = SDL_GetTicks64() * 1e-3f;
