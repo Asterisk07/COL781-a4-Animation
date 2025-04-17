@@ -14,3 +14,7 @@ target_link_libraries(col781 glm::glm OpenGL::GL SDL2::SDL2)
 add_executable(example executables/example.cpp)
 target_include_directories(example PUBLIC src)
 target_link_libraries(example col781)
+
+add_executable(e1 executables/e1.cpp)
+target_include_directories(e1 PUBLIC src)
+target_link_libraries(e1 col781)
