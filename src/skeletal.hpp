@@ -39,7 +39,8 @@ struct Joint {
 };
 
 Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-               glm::vec3 axis, std::vector<Joint> &jointList);
+               glm::vec3 axis, std::vector<Joint> &jointList, float length,
+               float width, float depth);
 
 // Optional helper
 void setTheta(Joint &joint, float theta);
@@ -72,7 +73,7 @@ void createBoxMesh(std::vector<glm::vec3> &vertices,
 
 // 2. Builder Function: createBone
 Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-                 glm::vec3 axis);
+                 glm::vec3 axis, float length, float width, float depth);
 
 void updateBoneTransforms(Bone *bone,
                           const glm::mat4 &parent_transform = glm::mat4(1.0f));

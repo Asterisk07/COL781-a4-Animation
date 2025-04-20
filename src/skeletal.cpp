@@ -3,26 +3,104 @@
 // namespace Skeleton {
 
 // Creates a simple flat rectangular mesh centered at origin
+// void createBoxMesh(std::vector<glm::vec3> &vertices,
+//                    std::vector<glm::vec3> &normals,
+//                    std::vector<glm::ivec3> &triangles) {
+//   // Define a flat rectangle (quad split into 2 triangles)
+//   vertices = {
+//       glm::vec3(-0.05f, 0.0f, 0.0f), // bottom left
+//       glm::vec3(0.05f, 0.0f, 0.0f),  // bottom right
+//       glm::vec3(0.05f, 1.0f, 0.0f),  // top right
+//       glm::vec3(-0.05f, 1.0f, 0.0f)  // top left
+//   };
+
+//   triangles = {glm::ivec3(0, 1, 2), glm::ivec3(0, 2, 3)};
+
+//   glm::vec3 normal = glm::vec3(0, 0, 1);
+//   normals = {normal, normal, normal, normal};
+// }
+
+// A simple rectangular prism (box) aligned along Y axis
+// float w = width * 0.5f;
+// float d = depth * 0.5f;
+// float h = length;
+
+// // 8 corners of the box
+// glm::vec3 v0 = glm::vec3(-w, 0, -d); // bottom face
+// glm::vec3 v1 = glm::vec3(w, 0, -d);
+// glm::vec3 v2 = glm::vec3(w, 0, d);
+// glm::vec3 v3 = glm::vec3(-w, 0, d);
+
+// glm::vec3 v4 = glm::vec3(-w, h, -d); // top face
+// glm::vec3 v5 = glm::vec3(w, h, -d);
+// glm::vec3 v6 = glm::vec3(w, h, d);
+// glm::vec3 v7 = glm::vec3(-w, h, d);
+
 void createBoxMesh(std::vector<glm::vec3> &vertices,
                    std::vector<glm::vec3> &normals,
-                   std::vector<glm::ivec3> &triangles) {
-  // Define a flat rectangle (quad split into 2 triangles)
+                   std::vector<glm::ivec3> &triangles, float length,
+                   float width, float depth) {
+
+  float x0 = 0.0f;
+  float x1 = length;
+
+  float y0 = 0.0f;
+  float y1 = width;
+
+  float z0 = 0.0f;
+  float z1 = depth;
+
+  glm::vec3 v0 = glm::vec3(x0, y0, z0);
+  glm::vec3 v1 = glm::vec3(x1, y0, z0);
+  glm::vec3 v2 = glm::vec3(x1, y1, z0);
+  glm::vec3 v3 = glm::vec3(x0, y1, z0);
+
+  glm::vec3 v4 = glm::vec3(x0, y0, z1);
+  glm::vec3 v5 = glm::vec3(x1, y0, z1);
+  glm::vec3 v6 = glm::vec3(x1, y1, z1);
+  glm::vec3 v7 = glm::vec3(x0, y1, z1);
+
+  // float h = length * 0.5f;
+  // float d = depth * 0.5f;
+
+  // // aligned along +X axis now (x=0 is joint)
+  // glm::vec3 v0 = glm::vec3(0.0f, -h, -d);
+  // glm::vec3 v1 = glm::vec3(width, -h, -d);
+  // glm::vec3 v2 = glm::vec3(width, h, -d);
+  // glm::vec3 v3 = glm::vec3(0.0f, h, -d);
+
+  // glm::vec3 v4 = glm::vec3(0.0f, -h, d);
+  // glm::vec3 v5 = glm::vec3(width, -h, d);
+  // glm::vec3 v6 = glm::vec3(width, h, d);
+  // glm::vec3 v7 = glm::vec3(0.0f, h, d);
+
   vertices = {
-      glm::vec3(-0.05f, 0.0f, 0.0f), // bottom left
-      glm::vec3(0.05f, 0.0f, 0.0f),  // bottom right
-      glm::vec3(0.05f, 1.0f, 0.0f),  // top right
-      glm::vec3(-0.05f, 1.0f, 0.0f)  // top left
+      v0, v1, v2, v3, // bottom  (0-3)
+      v4, v5, v6, v7  // top     (4-7)
   };
 
-  triangles = {glm::ivec3(0, 1, 2), glm::ivec3(0, 2, 3)};
+  // Triangles (12 total = 2 per face)
+  triangles = {
+      {0, 1, 2}, {0, 2, 3}, // bottom
+      {4, 5, 6}, {4, 6, 7}, // top
+      {0, 1, 5}, {0, 5, 4}, // front
+      {1, 2, 6}, {1, 6, 5}, // right
+      {2, 3, 7}, {2, 7, 6}, // back
+      {3, 0, 4}, {3, 4, 7}  // left
+  };
 
-  glm::vec3 normal = glm::vec3(0, 0, 1);
-  normals = {normal, normal, normal, normal};
+  // Simple normals per vertex (pointing up for now, you can compute proper ones
+  // later)
+  normals = {
+      {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, {0, -1, 0}, // bottom
+      {0, 1, 0},  {0, 1, 0},  {0, 1, 0},  {0, 1, 0}   // top
+  };
 }
+
 // 2. Builder Function: createBone
 // Inside skeletal.cpp
 Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-                 glm::vec3 axis) {
+                 glm::vec3 axis, float length, float width, float depth) {
   Bone *b = new Bone();
   b->parent = parent;
   b->joint_pos = joint_pos;
@@ -32,7 +110,8 @@ Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
 
   std::vector<glm::vec3> verts, norms;
   std::vector<glm::ivec3> tris;
-  createBoxMesh(verts, norms, tris); // mesh created
+  createBoxMesh(verts, norms, tris, length, width,
+                depth); // mesh created
 
   b->mesh_vertices_local = verts;
   b->mesh_normals_local = norms;
@@ -50,6 +129,14 @@ Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
   return b;
 }
 
+// } // namespace Skeleton
+Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
+               glm::vec3 axis, std::vector<Joint> &jointList, float length,
+               float width, float depth) {
+  Bone *b = createBone(r, parent, joint_pos, axis, length, width, depth);
+  jointList.push_back({b, 0.0f});
+  return b;
+}
 // Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
 //                  glm::vec3 axis) {
 //   Bone *bone = new Bone();
@@ -155,14 +242,6 @@ void updateAllMeshes(GL::Rasterizer &r, Bone *root) {
   updateBoneMesh(r, root);
   for (Bone *child : root->children)
     updateAllMeshes(r, child);
-}
-
-// } // namespace Skeleton
-Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-               glm::vec3 axis, std::vector<Joint> &jointList) {
-  Bone *b = createBone(r, parent, joint_pos, axis);
-  jointList.push_back({b, 0.0f});
-  return b;
 }
 
 void setTheta(Joint &joint, float theta) {

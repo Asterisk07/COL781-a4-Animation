@@ -48,28 +48,21 @@ int main() {
   //   glm::vec3 axis, std::vector<Joint> &jointList, float length,
   //   float width, float depth)
   float l = 0.2f, b = 0.8f, h = 0.2f;
-  float initial_y = 0.2f;
-  root = addJoint(r, nullptr, glm::vec3(0.4f, initial_y, -1.0f),
-                  glm::vec3(1, 0, 0), joints, 1.0f, 1.0f,
-                  1.0f); // shoulder (fixed)
+  root = addJoint(r, nullptr, glm::vec3(0.4f, -0.0f, -1.0f), glm::vec3(1, 0, 0),
+                  joints, 1.0f, 1.0f, 1.0f); // shoulder (fixed)
   Bone *forearm = addJoint(r, root, glm::vec3(0.0f, 0.5f, 0.0f),
                            glm::vec3(0, 0, 1), joints, l, b, h); // elbow
+  Bone *hand = addJoint(r, forearm, glm::vec3(0.0f, 0.5f, 0.0f),
+                        glm::vec3(0, 0, 1), joints, l, b, h); // elbow
 
-  keyframeTimes = {0.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+  keyframeTimes = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
 
   keyframes = {
-      {0.0f, 0.0f},  // frame 1: straight arm
-      {0.0f, 3.14f}, // frame 2: elbow bent
-      {0.0f, 3.14f}, // frame 2: elbow bent
-      {0.0f, 3.14f}, // frame 2: elbow bent
-      {0.0f, 3.14f}, // frame 2: elbow bent
-      {0.0f, 3.14f}, // frame 2: elbow bent
-                     // {0.0f, 0.0f, 0.0f},   // frame 1: straight arm
-                     // {0.0f, 3.14f, -0.0f}, // frame 2: elbow bent
-                     // {0.0f, 0.0f, 0.0f},   // frame 1: straight arm
-                     // {0.0f, 4.0f, 0.0f},  // frame 3: elbow bent other way
-                     // {0.0f, 6.0f, 0.0f},  // frame 4: back to straight
-                     // {0.0f, 8.0f, 0.0f}   // frame 4: back to straight
+      {0.0f, 0.0f, 0.0f},  // frame 1: straight arm
+      {0.0f, 2.0f, -0.0f}, // frame 2: elbow bent
+      {0.0f, 4.0f, 0.0f},  // frame 3: elbow bent other way
+      {0.0f, 1.5f, 0.0f},  // frame 4: back to straight
+      {0.0f, 2.0f, 0.0f}   // frame 4: back to straight
   };
   /*---- END OF USER INPUT ----*/
 
