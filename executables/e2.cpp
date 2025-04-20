@@ -1,9 +1,17 @@
 #include "spring.hpp"
+#include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp> // JSON for Modern C++
+#include <string>
 
 using namespace COL781;
 namespace GL = COL781::OpenGL;
 using namespace glm;
+using json = nlohmann::json;
+#include <stdexcept>
+
+// Config file path
+const std::string CONFIG_FILE = "config/config_current.json";
 
 GL::Rasterizer r;
 GL::ShaderProgram program;
@@ -12,33 +20,134 @@ CameraControl camCtl;
 // Global variables for simulation
 ClothSystem *cloth = nullptr;
 float simulationTime = 0.0f;
-float timeStep = 0.0005f;
+float timeStep = 10.0f; // Default value, will be overridden
 bool paused = false;
 
-void initializeScene() {
-  // Setup the cloth simulation parameters
+// Load cloth configuration from a JSON file
+ClothSystem::ClothConfig loadClothConfig(const std::string &configFile) {
   ClothSystem::ClothConfig config;
-  config.width = 1.0f;     // 1m width
-  config.height = 1.0f;    // 1m height
-  config.resolutionX = 21; // 21x21 grid (20 segments)
-  config.resolutionY = 21;
-  config.particleMass = 0.01f; // 10g per particle
 
-  // Spring constants - follow the relationship: kBending << kShear <
-  // kStructural
-  config.kStructural = 500.0f; // Strong structural springs
-  config.kShear = 100.0f;      // Medium shear springs
-  config.kBending = 10.0f;     // Weak bending springs
+  try {
+    // Read JSON file
+    std::ifstream file(configFile);
+    if (!file.is_open()) {
+      std::cerr << "Error: Could not open config file: " << configFile
+                << std::endl;
+      std::exit(EXIT_FAILURE);
+      // Return default config if file can't be opened
+      //   return config;
+    }
 
-  // Damping constants - much less than the corresponding spring constants
-  config.dStructural = 5.0f;
-  config.dShear = 1.0f;
-  config.dBending = 0.1f;
+    json j;
+    file >> j;
 
-  config.gravity = 9.8f;        // Standard gravity
-  config.fixedCorners = {0, 1}; // Fix top-left and top-right corners
+    try {
+      // Load timestep
+      timeStep = j.at("timeStep").get<float>();
 
-  // Create cloth system
+      // Load cloth dimensions
+      config.width = j.at("width").get<float>();
+      config.height = j.at("height").get<float>();
+      config.resolutionX = j.at("resolutionX").get<int>();
+      config.resolutionY = j.at("resolutionY").get<int>();
+      config.particleMass = j.at("particleMass").get<float>();
+
+      // Load spring constants
+      config.kStructural = j.at("kStructural").get<float>();
+      config.kShear = j.at("kShear").get<float>();
+      config.kBending = j.at("kBending").get<float>();
+
+      // Load damping constants
+      config.dStructural = j.at("dStructural").get<float>();
+      config.dShear = j.at("dShear").get<float>();
+      config.dBending = j.at("dBending").get<float>();
+
+      // Load gravity
+      config.gravity = j.at("gravity").get<float>();
+
+      // Load fixed corners
+      config.fixedCorners = j.at("fixedCorners").get<std::vector<int>>();
+
+    } catch (const nlohmann::json::exception &e) {
+      std::cerr << "FATAL CONFIG ERROR: Missing required field - " << e.what()
+                << std::endl;
+      std::exit(EXIT_FAILURE); // Crash immediately
+    }
+    std::cerr << "Loaded file " << std::endl;
+    {
+      // // Load timetep
+      // timeStep = j.value("timeStep", 0.005f);
+
+      // // Load cloth dimensions
+      // config.width = j.value("width", 1.0f);
+      // config.height = j.value("height", 1.0f);
+      // config.resolutionX = j.value("resolutionX", 21);
+      // config.resolutionY = j.value("resolutionY", 21);
+      // config.particleMass = j.value("particleMass", 0.1f);
+
+      // // Load spring constants
+      // config.kStructural = j.value("kStructural", 500.0f);
+      // config.kShear = j.value("kShear", 100.0f);
+      // config.kBending = j.value("kBending", 10.0f);
+
+      // // Load damping constants
+      // config.dStructural = j.value("dStructural", 5.0f);
+      // config.dShear = j.value("dShear", 1.0f);
+      // config.dBending = j.value("dBending", 0.1f);
+
+      // // Load gravity
+      // config.gravity = j.value("gravity", 9.8f);
+    }
+    { // Load timestep
+      //   timeStep = j.value("timeStep");
+
+      //   // Load cloth dimensions
+      //   config.width = j.value("width");
+      //   config.height = j.value("height");
+      //   config.resolutionX = j.value("resolutionX");
+      //   config.resolutionY = j.value("resolutionY");
+      //   config.particleMass = j.value("particleMass");
+
+      //   // Load spring constants
+      //   config.kStructural = j.value("kStructural");
+      //   config.kShear = j.value("kShear");
+      //   config.kBending = j.value("kBending");
+
+      //   // Load damping constants
+      //   config.dStructural = j.value("dStructural");
+      //   config.dShear = j.value("dShear");
+      //   config.dBending = j.value("dBending");
+
+      //   // Load gravity
+      //   config.gravity = j.value("gravity");
+    }
+    // Load fixed corners
+    if (j.contains("fixedCorners")) {
+      config.fixedCorners.clear();
+      for (auto &corner : j["fixedCorners"]) {
+        config.fixedCorners.push_back(corner);
+      }
+    } else {
+      config.fixedCorners = {0, 1}; // Default to top-left and top-right corners
+    }
+
+    std::cout << "Successfully loaded config from: " << configFile << std::endl;
+  } catch (json::exception &e) {
+    std::cerr << "JSON parsing error: " << e.what() << std::endl;
+    std::cerr << "Using default configuration." << std::endl;
+  } catch (std::exception &e) {
+    std::cerr << "Error loading config: " << e.what() << std::endl;
+    std::cerr << "Using default configuration." << std::endl;
+  }
+
+  return config;
+}
+
+void initializeScene() {
+  // Load the cloth simulation parameters from config file
+  ClothSystem::ClothConfig config = loadClothConfig(CONFIG_FILE);
+
+  // Create cloth system with loaded configuration
   cloth = new ClothSystem(config);
 }
 
