@@ -1,3 +1,5 @@
+
+
 #ifndef SPRING_HPP
 #define SPRING_HPP
 
@@ -12,7 +14,6 @@ namespace COL781 {
 class Particle;
 class Spring;
 class ClothSystem;
-class Obstacle;
 
 // Class to represent a particle in the system
 class Particle {
@@ -63,8 +64,6 @@ public:
     float dShear;       // Damping constant for shear springs
     float dBending;     // Damping constant for bending springs
     float gravity;      // Gravity acceleration (m/s^2)
-    float restitution;  // Coefficient of restitution (epsilon) for collisions
-    float friction;     // Coefficient of friction (mu) for collisions
     std::vector<int>
         fixedCorners; // Indices of fixed corners (0=top-left, 1=top-right,
                       // 2=bottom-left, 3=bottom-right)
@@ -79,12 +78,6 @@ public:
   void draw(OpenGL::Rasterizer &r, OpenGL::ShaderProgram &program,
             const Camera &camera); // Draw the cloth
 
-  // Add obstacle to the system
-  void addObstacle(Obstacle *obstacle);
-
-  // Handle collisions with all obstacles
-  void handleCollisions();
-
   // Getters
   int getNumParticles() const { return particles.size(); }
   int getNumSprings() const { return springs.size(); }
@@ -96,7 +89,6 @@ private:
   ClothConfig config;
   std::vector<Particle *> particles;
   std::vector<Spring *> springs;
-  std::vector<Obstacle *> obstacles;
 
   // Helper variables for rendering
   OpenGL::Object object;
@@ -112,9 +104,6 @@ private:
   void createSprings(SpringType type);
   void updateNormals();
   void initializeRendering(OpenGL::Rasterizer &r);
-
-  // Handle collision between a particle and an obstacle
-  void handleCollision(Particle *particle, Obstacle *obstacle);
 };
 
 } // namespace COL781

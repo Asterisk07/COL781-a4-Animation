@@ -1,5 +1,5 @@
-#include "spring.hpp"
 #include "obstacle.hpp"
+#include "spring.hpp"
 #include <glm/glm.hpp>
 #include <iostream>
 
@@ -10,7 +10,11 @@ Particle::Particle(const glm::vec3 &pos, float m, bool fixed)
     : position(pos), velocity(glm::vec3(0.0f)), force(glm::vec3(0.0f)), mass(m),
       isFixed(fixed) {}
 
-void Particle::applyForce(const glm::vec3 &f) { force += f; }
+void Particle::applyForce(const glm::vec3 &f) {
+  if (!isFixed) {
+    force += f;
+  }
+}
 
 void Particle::update(float dt) {
   if (isFixed)
@@ -80,6 +84,8 @@ ClothSystem::~ClothSystem() {
   for (auto s : springs) {
     delete s;
   }
+  particles.clear();
+  springs.clear();
   // Note: We don't delete obstacles as they are owned by the main program
 }
 
@@ -177,14 +183,13 @@ void ClothSystem::createParticles() {
   float dx = config.width / (config.resolutionX - 1);
   float dy = config.height / (config.resolutionY - 1);
 
-  for (int j = 0; j < config.resolutionY; ++j) {
-    for (int i = 0; i < config.resolutionX; ++i) {
-      // Initial position (x, y, z)
-      glm::vec3 pos(i * dx, 0.0f, j * dy);
-
-      // Adjust position to center the cloth
-      pos.x -= config.width / 2.0f;
-      pos.z -= config.height / 2.0f;
+  // Create particles in a grid
+  for (int i = 0; i < config.resolutionY; ++i) {
+    for (int j = 0; j < config.resolutionX; ++j) {
+      // Calculate position (initially horizontal sheet in XZ plane)
+      float x = j * dx;
+      float y = 0.0f; // Initially flat horizontal cloth
+      float z = i * dz;
 
       // Check if this is a fixed corner
       bool isFixed = false;
@@ -349,79 +354,38 @@ void ClothSystem::updateNormals() {
 }
 
 void ClothSystem::initializeRendering(OpenGL::Rasterizer &r) {
-  // Create object for rendering
-  object = r.createObject();
-
   // Create vertex and normal buffers
-  vertexBuf =
-      r.createVertexAttribs(object, 0, vertices.size(), vertices.data());
-  normalBuf = r.createVertexAttribs(object, 1, normals.size(), normals.data());
+  vertexBuf = r.createAttribBuf(vertices);
+  normalBuf = r.createAttribBuf(normals);
 
-  // Create triangle indices
-  r.createTriangleIndices(object, triangles.size(), triangles.data());
+  // Create object and set attributes
+  object = r.createObject();
+  r.setVertexAttribs(object, vertexBuf);
+  r.setVertexAttribs(object, normalBuf, 1);
+  r.setTriangleIndices(object, triangles);
 }
 
 void ClothSystem::draw(OpenGL::Rasterizer &r, OpenGL::ShaderProgram &program,
                        const Camera &camera) {
   // Initialize rendering if not done yet
-  if (object.tri_vao == 0) {
+  if (object == 0) {
     initializeRendering(r);
   }
 
   // Update vertex and normal buffers
-  r.updateVertexAttribs(vertexBuf, vertices.size(), vertices.data());
-  r.updateVertexAttribs(normalBuf, normals.size(), normals.data());
+  r.updateAttribBuf(vertexBuf, vertices);
+  r.updateAttribBuf(normalBuf, normals);
 
   // Draw cloth
-  r.setupFilledFaces();
-  glm::vec3 clothColor(0.7f, 0.7f, 0.9f); // Cloth color
-  glm::vec3 white(1.0f, 1.0f, 1.0f);
-  r.setUniform(program, "ambientColor", 0.2f * white);
-  r.setUniform(program, "extdiffuseColor", 0.8f * clothColor);
-  r.setUniform(program, "intdiffuseColor", 0.4f * clothColor);
-  r.setUniform(program, "specularColor", 0.6f * white);
-  r.setUniform(program, "phongExponent", 20.0f);
-  r.drawTriangles(object);
+  r.setUniform(program, "objectColor",
+               glm::vec3(0.7f, 0.7f, 0.9f)); // Cloth color
+  r.drawObject(object);
 
   // Draw all obstacles
   for (auto obstacle : obstacles) {
     obstacle->draw(r, program, camera);
   }
 }
-
-// void ClothSystem::initializeRendering(OpenGL::Rasterizer &r) {
-//   // Create vertex and normal buffers
-//   vertexBuf = r.createAttribBuf(vertices);
-//   normalBuf = r.createAttribBuf(normals);
-
-//   // Create object and set attributes
-//   object = r.createObject();
-//   r.setVertexAttribs(object, vertexBuf);
-//   r.setVertexAttribs(object, normalBuf, 1);
-//   r.setTriangleIndices(object, triangles);
-// }
-
-// void ClothSystem::draw(OpenGL::Rasterizer &r, OpenGL::ShaderProgram &program,
-//                        const Camera &camera) {
-//   // Initialize rendering if not done yet
-//   if (object == 0) {
-//     initializeRendering(r);
-//   }
-
-//   // Update vertex and normal buffers
-//   r.updateAttribBuf(vertexBuf, vertices);
-//   r.updateAttribBuf(normalBuf, normals);
-
-//   // Draw cloth
-//   r.setUniform(program, "objectColor",
-//                glm::vec3(0.7f, 0.7f, 0.9f)); // Cloth color
-//   r.drawObject(object);
-
-//   // Draw all obstacles
-//   for (auto obstacle : obstacles) {
-//     obstacle->draw(r, program, camera);
-//   }
-// }
 
 void ClothSystem::addObstacle(Obstacle *obstacle) {
   if (obstacle) {
