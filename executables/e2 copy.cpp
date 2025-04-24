@@ -19,8 +19,8 @@ CameraControl camCtl;
 
 // Global variables for simulation
 ClothSystem *cloth = nullptr;
-float simulationTime = 0.0f;
-float timeStep = 10.0f; // Default value, will be overridden
+// float simulationTime = 0.0f;
+// float timeStep = 10.0f; // Default value, will be overridden
 bool paused = false;
 
 // Load cloth configuration from a JSON file
@@ -43,7 +43,7 @@ ClothSystem::ClothConfig loadClothConfig(const std::string &configFile) {
 
     try {
       // Load timestep
-      timeStep = j.at("timeStep").get<float>();
+      config.timeStep = j.at("timeStep").get<float>();
 
       // Load cloth dimensions
       config.width = j.at("width").get<float>();
@@ -112,9 +112,9 @@ void updateScene(float t) {
   if (!paused) {
     // Perform multiple mini-steps for better stability
     for (int i = 0; i < 10; ++i) {
-      cloth->update(timeStep);
+      cloth->update();
     }
-    simulationTime += timeStep * 10.0f;
+    // simulationTime += *10.0f;
   }
 }
 
@@ -130,7 +130,7 @@ void handleInput() {
       case SDLK_r:
         // Reset simulation
         cloth->reset();
-        simulationTime = 0.0f;
+        // simulationTime = 0.0f;
         break;
       case SDLK_ESCAPE:
         SDL_Quit();
@@ -188,8 +188,8 @@ int main() {
     cloth->draw(r, program, camera);
 
     // Display simulation info
-    std::cout << "\rSimulation time: " << simulationTime << " seconds"
-              << (paused ? " (PAUSED)" : "") << std::flush;
+    // std::cout << "\rSimulation time: " << simulationTime << " seconds"
+    //           << (paused ? " (PAUSED)" : "") << std::flush;
 
     // Show the rendered frame
     r.show();
