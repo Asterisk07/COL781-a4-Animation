@@ -26,6 +26,7 @@ example:
 # Pattern rule to handle targets 1-6
 %:
 	@if [ $(MAKECMDGOALS) -ge 1 ] && [ $(MAKECMDGOALS) -le 9 ]; then \
+		# rm ./build/e$(MAKECMDGOALS); \
 		clear; \
 		if $(MAKE) --no-print-directory --silent -C build e$(MAKECMDGOALS); then \
 			./build/e$(MAKECMDGOALS); \

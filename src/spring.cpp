@@ -5,23 +5,27 @@
 
 namespace COL781 {
 
-// Particle implementation
+// Particle Implementation
 Particle::Particle(const glm::vec3 &pos, float m, bool fixed)
     : position(pos), velocity(glm::vec3(0.0f)), force(glm::vec3(0.0f)), mass(m),
       isFixed(fixed) {}
 
-void Particle::applyForce(const glm::vec3 &f) { force += f; }
+void Particle::applyForce(const glm::vec3 &f) {
+  if (!isFixed) {
+    force += f;
+  }
+}
 
 void Particle::update(float dt) {
-  if (isFixed)
-    return;
+  if (!isFixed) {
+    // Semi-implicit Euler integration
+    glm::vec3 acceleration = force / mass;
+    velocity += acceleration * dt;
+    position += velocity * dt;
 
-  // Semi-implicit Euler integration
-  velocity += force / mass * dt;
-  position += velocity * dt;
-
-  // Reset force for next step
-  force = glm::vec3(0.0f);
+    // Reset force for next frame
+    force = glm::vec3(0.0f);
+  }
 }
 
 void Particle::reset(const glm::vec3 &pos) {
@@ -30,33 +34,40 @@ void Particle::reset(const glm::vec3 &pos) {
   force = glm::vec3(0.0f);
 }
 
-// Spring implementation
+// Spring Implementation
 Spring::Spring(Particle *particle1, Particle *particle2, float rest_length,
                float spring_const, float damping_const)
     : p1(particle1), p2(particle2), restLength(rest_length), ks(spring_const),
       kd(damping_const) {}
 
 void Spring::applyForce() {
-  // Vector from p1 to p2
+  // Calculate spring direction vector
   glm::vec3 direction = p2->position - p1->position;
-  float length = glm::length(direction);
+  float distance = glm::length(direction);
 
-  if (length > 0.00001f) { // Avoid division by zero
-    direction /= length;   // Normalize the direction
-
-    // Compute relative velocity
-    glm::vec3 velDiff = p2->velocity - p1->velocity;
-
-    // Spring force (Hooke's law) + Damping force
-    float springForce = ks * (length - restLength);
-    float dampingForce = kd * glm::dot(velDiff, direction);
-
-    glm::vec3 force = direction * (springForce + dampingForce);
-
-    // Apply forces to particles
-    p1->applyForce(force);
-    p2->applyForce(-force); // Equal and opposite force
+  // Avoid division by zero
+  if (distance < 0.00001f) {
+    return;
   }
+
+  // Normalize direction
+  glm::vec3 directionNorm = direction / distance;
+
+  // Calculate spring force using Hooke's law (F = -k * (|x| - L0) * x_hat)
+  float displacement = distance - restLength;
+  glm::vec3 springForce = ks * displacement * directionNorm;
+
+  // Calculate damping force (F_d = -kd * (v_rel · x_hat) * x_hat)
+  glm::vec3 relativeVelocity = p2->velocity - p1->velocity;
+  float dampingMagnitude = kd * glm::dot(relativeVelocity, directionNorm);
+  glm::vec3 dampingForce = dampingMagnitude * directionNorm;
+
+  // Total force
+  glm::vec3 totalForce = springForce + dampingForce;
+
+  // Apply forces to particles (equal and opposite)
+  p1->applyForce(totalForce);
+  p2->applyForce(-totalForce);
 }
 
 // ClothSystem implementation
@@ -80,6 +91,8 @@ ClothSystem::~ClothSystem() {
   for (auto s : springs) {
     delete s;
   }
+  particles.clear();
+  springs.clear();
   // Note: We don't delete obstacles as they are owned by the main program
 }
 
@@ -95,46 +108,14 @@ void ClothSystem::initialize() {
 
   // Create bending springs
   createSprings(SpringType::BENDING);
-
-  // Initialize triangle indices for rendering
-  triangles.clear();
-  for (int j = 0; j < config.resolutionY - 1; ++j) {
-    for (int i = 0; i < config.resolutionX - 1; ++i) {
-      int p1 = getParticleIndex(i, j);
-      int p2 = getParticleIndex(i + 1, j);
-      int p3 = getParticleIndex(i, j + 1);
-      int p4 = getParticleIndex(i + 1, j + 1);
-
-      // Two triangles per grid cell
-      triangles.push_back(glm::ivec3(p1, p2, p3));
-      triangles.push_back(glm::ivec3(p2, p4, p3));
-    }
-  }
-
-  // Initialize edges for debug rendering
-  edges.clear();
-  for (auto spring : springs) {
-    if (spring) {
-      int p1Index = -1, p2Index = -1;
-      for (size_t i = 0; i < particles.size(); ++i) {
-        if (particles[i] == spring->p1)
-          p1Index = i;
-        if (particles[i] == spring->p2)
-          p2Index = i;
-      }
-      if (p1Index >= 0 && p2Index >= 0) {
-        edges.push_back(glm::ivec2(p1Index, p2Index));
-      }
-    }
-  }
 }
 
 void ClothSystem::reset() {
-  // Recreate all particles and springs
+  // Clean up memory
   for (auto p : particles) {
     delete p;
   }
-  for (auto s : springs) {
+  for (auto &s : springs) {
     delete s;
   }
   particles.clear();
@@ -167,179 +148,160 @@ void ClothSystem::update(float dt) {
   updateNormals();
 }
 
+// CRITICAL CHANGE: Use the same indexing scheme as the old file
 int ClothSystem::getParticleIndex(int i, int j) const {
-  return j * config.resolutionX + i;
+  return i * config.resolutionX + j; // Match old_cpp indexing
 }
 
 void ClothSystem::createParticles() {
-  particles.clear();
-
   float dx = config.width / (config.resolutionX - 1);
-  float dy = config.height / (config.resolutionY - 1);
+  float dz = config.height / (config.resolutionY - 1);
 
-  for (int j = 0; j < config.resolutionY; ++j) {
-    for (int i = 0; i < config.resolutionX; ++i) {
-      // Initial position (x, y, z)
-      glm::vec3 pos(i * dx, 0.0f, j * dy);
+  // Create particles in a grid (matching the old file's layout)
+  for (int i = 0; i < config.resolutionY; ++i) {
+    for (int j = 0; j < config.resolutionX; ++j) {
+      // Calculate position (initially horizontal sheet in XZ plane)
+      float x = j * dx;
+      float y = 0.0f; // Initially flat horizontal cloth
+      float z = i * dz;
 
-      // Adjust position to center the cloth
-      pos.x -= config.width / 2.0f;
-      pos.z -= config.height / 2.0f;
-
-      // Check if this is a fixed corner
+      // Check if this particle should be fixed
       bool isFixed = false;
-      int cornerIndex = -1;
 
-      if (i == 0 && j == 0)
-        cornerIndex = 0; // Top-left
-      else if (i == config.resolutionX - 1 && j == 0)
-        cornerIndex = 1; // Top-right
-      else if (i == 0 && j == config.resolutionY - 1)
-        cornerIndex = 2; // Bottom-left
-      else if (i == config.resolutionX - 1 && j == config.resolutionY - 1)
-        cornerIndex = 3; // Bottom-right
-
-      if (cornerIndex >= 0) {
-        for (int corner : config.fixedCorners) {
-          if (corner == cornerIndex) {
-            isFixed = true;
-            break;
-          }
+      // Check corners: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+      for (int corner : config.fixedCorners) {
+        if ((corner == 0 && i == 0 && j == 0) || // Top-left
+            (corner == 1 && i == 0 &&
+             j == config.resolutionX - 1) || // Top-right
+            (corner == 2 && i == config.resolutionY - 1 &&
+             j == 0) || // Bottom-left
+            (corner == 3 && i == config.resolutionY - 1 &&
+             j == config.resolutionX - 1)) { // Bottom-right
+          isFixed = true;
+          break;
         }
       }
 
-      // Create and add the particle
-      Particle *p = new Particle(pos, config.particleMass, isFixed);
+      // Create particle and add to array
+      Particle *p =
+          new Particle(glm::vec3(x, y, z), config.particleMass, isFixed);
       particles.push_back(p);
     }
   }
 }
 
 void ClothSystem::createSprings(SpringType type) {
+  float dx = config.width / (config.resolutionX - 1);
+  float dz = config.height / (config.resolutionY - 1);
+
+  // Use appropriate spring constants and damping constants based on spring type
+  float springConstant = 0.0f;
+  float dampingConstant = 0.0f;
+
   switch (type) {
-  case SpringType::STRUCTURAL: {
-    // Create structural springs (connecting adjacent particles horizontally and
-    // vertically)
-    for (int j = 0; j < config.resolutionY; ++j) {
-      for (int i = 0; i < config.resolutionX; ++i) {
-        // Get current particle
-        int idx = getParticleIndex(i, j);
-        Particle *p = particles[idx];
+  case SpringType::STRUCTURAL:
+    springConstant = config.kStructural;
+    dampingConstant = config.dStructural;
+    break;
+  case SpringType::SHEAR:
+    springConstant = config.kShear;
+    dampingConstant = config.dShear;
+    break;
+  case SpringType::BENDING:
+    springConstant = config.kBending;
+    dampingConstant = config.dBending;
+    break;
+  }
 
-        // Connect to right neighbor
-        if (i < config.resolutionX - 1) {
-          int rightIdx = getParticleIndex(i + 1, j);
-          Particle *rightP = particles[rightIdx];
-          float restLength = glm::distance(p->position, rightP->position);
-          Spring *s = new Spring(p, rightP, restLength, config.kStructural,
-                                 config.dStructural);
+  // Create springs based on type
+  for (int i = 0; i < config.resolutionY; ++i) {
+    for (int j = 0; j < config.resolutionX; ++j) {
+      int idx = getParticleIndex(i, j);
+
+      // Structural springs (connect adjacent particles)
+      if (type == SpringType::STRUCTURAL) {
+        // Horizontal springs
+        if (j < config.resolutionX - 1) {
+          int rightIdx = getParticleIndex(i, j + 1);
+          Spring *s = new Spring(particles[idx], particles[rightIdx], dx,
+                                 springConstant, dampingConstant);
           springs.push_back(s);
         }
 
-        // Connect to bottom neighbor
-        if (j < config.resolutionY - 1) {
-          int bottomIdx = getParticleIndex(i, j + 1);
-          Particle *bottomP = particles[bottomIdx];
-          float restLength = glm::distance(p->position, bottomP->position);
-          Spring *s = new Spring(p, bottomP, restLength, config.kStructural,
-                                 config.dStructural);
+        // Vertical springs
+        if (i < config.resolutionY - 1) {
+          int downIdx = getParticleIndex(i + 1, j);
+          Spring *s = new Spring(particles[idx], particles[downIdx], dz,
+                                 springConstant, dampingConstant);
+          springs.push_back(s);
+        }
+      }
+
+      // Shear springs (connect diagonal particles)
+      else if (type == SpringType::SHEAR) {
+        // Diagonal springs
+        if (i < config.resolutionY - 1 && j < config.resolutionX - 1) {
+          int diagIdx = getParticleIndex(i + 1, j + 1);
+          float diagLength = std::sqrt(dx * dx + dz * dz);
+          Spring *s = new Spring(particles[idx], particles[diagIdx], diagLength,
+                                 springConstant, dampingConstant);
+          springs.push_back(s);
+        }
+
+        // Other diagonal springs
+        if (i < config.resolutionY - 1 && j > 0) {
+          int diagIdx = getParticleIndex(i + 1, j - 1);
+          float diagLength = std::sqrt(dx * dx + dz * dz);
+          Spring *s = new Spring(particles[idx], particles[diagIdx], diagLength,
+                                 springConstant, dampingConstant);
+          springs.push_back(s);
+        }
+      }
+
+      // Bending springs (connect particles two apart)
+      else if (type == SpringType::BENDING) {
+        // Horizontal bending
+        if (j < config.resolutionX - 2) {
+          int bendIdx = getParticleIndex(i, j + 2);
+          Spring *s = new Spring(particles[idx], particles[bendIdx], 2.0f * dx,
+                                 springConstant, dampingConstant);
+          springs.push_back(s);
+        }
+
+        // Vertical bending
+        if (i < config.resolutionY - 2) {
+          int bendIdx = getParticleIndex(i + 2, j);
+          Spring *s = new Spring(particles[idx], particles[bendIdx], 2.0f * dz,
+                                 springConstant, dampingConstant);
           springs.push_back(s);
         }
       }
     }
-    break;
-  }
-
-  case SpringType::SHEAR: {
-    // Create shear springs (connecting diagonal particles)
-    for (int j = 0; j < config.resolutionY - 1; ++j) {
-      for (int i = 0; i < config.resolutionX - 1; ++i) {
-        // Get top-left particle
-        int tlIdx = getParticleIndex(i, j);
-        Particle *tlP = particles[tlIdx];
-
-        // Get bottom-right particle
-        int brIdx = getParticleIndex(i + 1, j + 1);
-        Particle *brP = particles[brIdx];
-
-        // Connect top-left to bottom-right
-        float restLength = glm::distance(tlP->position, brP->position);
-        Spring *s1 =
-            new Spring(tlP, brP, restLength, config.kShear, config.dShear);
-        springs.push_back(s1);
-
-        // Get top-right particle
-        int trIdx = getParticleIndex(i + 1, j);
-        Particle *trP = particles[trIdx];
-
-        // Get bottom-left particle
-        int blIdx = getParticleIndex(i, j + 1);
-        Particle *blP = particles[blIdx];
-
-        // Connect top-right to bottom-left
-        restLength = glm::distance(trP->position, blP->position);
-        Spring *s2 =
-            new Spring(trP, blP, restLength, config.kShear, config.dShear);
-        springs.push_back(s2);
-      }
-    }
-    break;
-  }
-
-  case SpringType::BENDING: {
-    // Create bending springs (connecting particles two steps away)
-    for (int j = 0; j < config.resolutionY; ++j) {
-      for (int i = 0; i < config.resolutionX; ++i) {
-        // Get current particle
-        int idx = getParticleIndex(i, j);
-        Particle *p = particles[idx];
-
-        // Connect to particle two steps to the right
-        if (i < config.resolutionX - 2) {
-          int rightIdx = getParticleIndex(i + 2, j);
-          Particle *rightP = particles[rightIdx];
-          float restLength = glm::distance(p->position, rightP->position);
-          Spring *s = new Spring(p, rightP, restLength, config.kBending,
-                                 config.dBending);
-          springs.push_back(s);
-        }
-
-        // Connect to particle two steps down
-        if (j < config.resolutionY - 2) {
-          int bottomIdx = getParticleIndex(i, j + 2);
-          Particle *bottomP = particles[bottomIdx];
-          float restLength = glm::distance(p->position, bottomP->position);
-          Spring *s = new Spring(p, bottomP, restLength, config.kBending,
-                                 config.dBending);
-          springs.push_back(s);
-        }
-      }
-    }
-    break;
-  }
   }
 }
 
 void ClothSystem::updateNormals() {
-  // Initialize vertex and normal buffers
-  vertices.resize(particles.size());
-  normals.resize(particles.size(), glm::vec3(0.0f));
-
-  // Copy particle positions to vertices
-  for (size_t i = 0; i < particles.size(); ++i) {
-    vertices[i] = particles[i]->position;
+  // Reset all normals
+  for (int i = 0; i < normals.size(); ++i) {
+    normals[i] = glm::vec3(0.0f);
   }
 
-  // Calculate normals for each triangle and accumulate at vertices
+  // Calculate face normals and add to vertex normals
   for (const auto &tri : triangles) {
-    glm::vec3 v1 = vertices[tri.y] - vertices[tri.x];
-    glm::vec3 v2 = vertices[tri.z] - vertices[tri.x];
-    glm::vec3 normal = glm::cross(v1, v2);
+    // Get vertices
+    const glm::vec3 &p0 = vertices[tri[0]];
+    const glm::vec3 &p1 = vertices[tri[1]];
+    const glm::vec3 &p2 = vertices[tri[2]];
 
-    // Accumulate normals (will be normalized later)
-    normals[tri.x] += normal;
-    normals[tri.y] += normal;
-    normals[tri.z] += normal;
+    // Calculate face normal
+    glm::vec3 e1 = p1 - p0;
+    glm::vec3 e2 = p2 - p0;
+    glm::vec3 normal = glm::normalize(glm::cross(e1, e2));
+
+    // Add to vertex normals
+    normals[tri[0]] += normal;
+    normals[tri[1]] += normal;
+    normals[tri[2]] += normal;
   }
 
   // Normalize all normals
@@ -352,76 +314,163 @@ void ClothSystem::initializeRendering(OpenGL::Rasterizer &r) {
   // Create object for rendering
   object = r.createObject();
 
+  // Initialize vertices and normals
+  vertices.resize(particles.size());
+  normals.resize(particles.size(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+  // Update vertices from particle positions
+  for (int i = 0; i < particles.size(); ++i) {
+    vertices[i] = particles[i]->position;
+  }
+
   // Create vertex and normal buffers
   vertexBuf =
       r.createVertexAttribs(object, 0, vertices.size(), vertices.data());
   normalBuf = r.createVertexAttribs(object, 1, normals.size(), normals.data());
 
+  // Create triangles - matches spring_old.cpp triangle creation
+  triangles.clear();
+  for (int i = 0; i < config.resolutionY - 1; ++i) {
+    for (int j = 0; j < config.resolutionX - 1; ++j) {
+      int idx = getParticleIndex(i, j);
+      int rightIdx = getParticleIndex(i, j + 1);
+      int downIdx = getParticleIndex(i + 1, j);
+      int diagIdx = getParticleIndex(i + 1, j + 1);
+
+      // First triangle
+      triangles.push_back(glm::ivec3(idx, rightIdx, diagIdx));
+
+      // Second triangle
+      triangles.push_back(glm::ivec3(idx, diagIdx, downIdx));
+    }
+  }
+
   // Create triangle indices
   r.createTriangleIndices(object, triangles.size(), triangles.data());
+
+  // Create edges
+  edges.clear();
+
+  // Horizontal edges
+  for (int i = 0; i < config.resolutionY; ++i) {
+    for (int j = 0; j < config.resolutionX - 1; ++j) {
+      int idx = getParticleIndex(i, j);
+      int rightIdx = getParticleIndex(i, j + 1);
+      edges.push_back(glm::ivec2(idx, rightIdx));
+    }
+  }
+
+  // Vertical edges
+  for (int i = 0; i < config.resolutionY - 1; ++i) {
+    for (int j = 0; j < config.resolutionX; ++j) {
+      int idx = getParticleIndex(i, j);
+      int downIdx = getParticleIndex(i + 1, j);
+      edges.push_back(glm::ivec2(idx, downIdx));
+    }
+  }
+
+  // Create edge indices
+  r.createEdgeIndices(object, edges.size(), edges.data());
 }
 
 void ClothSystem::draw(OpenGL::Rasterizer &r, OpenGL::ShaderProgram &program,
                        const Camera &camera) {
-  // Initialize rendering if not done yet
-  if (object.tri_vao == 0) {
+  // Initialize rendering data if not already done
+  // tk_std::cout << "\n  first call ready\n " << std::flush;
+  // if (object.tri_vao == 0) {
+  if (not initialise_flag) {
+    // tk_std::cout << "\n  initialised rnedering\n " << std::flush;
     initializeRendering(r);
+    initialise_flag = true;
+  } else {
+    // tk_std::cout << "\n  not initialised ready\n " << std::flush;
   }
 
-  // Update vertex and normal buffers
-  r.updateVertexAttribs(vertexBuf, vertices.size(), vertices.data());
-  r.updateVertexAttribs(normalBuf, normals.size(), normals.data());
+  // if (particles == nullptr) {
+  // tk_std::cout << "\n  number of particles : " << particles.size() << "\n "
+  // << std::flush; tk_std::cout << "\n  number of vertices : " <<
+  // vertices.size() << "\n "  << std::flush;
+  //   throw std::runtime_error("Null list of partucles encountered");
+  // }
+  // Update vertex positions from particles
+  // for (int i = 0; i < particles.size(); ++i)
+  //   //tk_std::cout << "\n  this particle exists :  " << i << "at " <<
+  //   particles[i]
+  //             << "\n " << std::flush;
 
-  // Draw cloth
+  for (int i = 0; i < particles.size(); ++i) {
+
+    //   vertices[i] = particles[i]->position;
+    // }
+
+    if (particles[i] != nullptr) { // Check for null pointer
+      // //tk_std::cout << "\n  particle " << i << " gonna set\n " <<
+      // std::flush;
+
+      vertices[i] = particles[i]->position;
+      // vertices.push_back(particles[i]->position);
+      // //tk_std::cout << "\n  particle " << i << " is  set \n " << std::flush;
+    } else {
+      // //tk_std::cout << "\n  particle " << i << " is not  ready\n " <<
+      // std::flush; Handle the null case - choose one of these options:
+
+      // Option 1: Skip this particle
+      // continue;
+
+      // Option 2: Assign a default value
+      // vertices[i] = Vector3f(0.0f, 0.0f, 0.0f);
+
+      // Option 3: Log a warning/error
+      // std::cerr << "Warning: Null particle at index " << i << std::endl;
+
+      // Option 4: Throw an exception
+      throw std::runtime_error("Null particle encountered");
+    }
+  }
+  // tk_std::cout << "\n  particle array ready\n " << std::flush;
+  //  Update vertex buffers
+  r.updateVertexAttribs(vertexBuf, vertices.size(), vertices.data());
+
+  // tk_std::cout << "\n  vertex buffer ready\n " << std::flush;
+  //  Update normals
+  updateNormals();
+  // tk_std::cout << "\n  normal updation ready\n " << std::flush;
+  r.updateVertexAttribs(normalBuf, normals.size(), normals.data());
+  // //tk_std::cout << "\n  vertex buffer ready\n " << std::flush;
+  // tk_std::cout << "\n  normal buffer ready\n " << std::flush;
+
+  // Draw triangles - using the same colors as the old implementation
   r.setupFilledFaces();
-  glm::vec3 clothColor(0.7f, 0.7f, 0.9f); // Cloth color
+  glm::vec3 blue(0.2f, 0.4f, 0.8f); // Match old_cpp blue color
   glm::vec3 white(1.0f, 1.0f, 1.0f);
   r.setUniform(program, "ambientColor", 0.2f * white);
-  r.setUniform(program, "extdiffuseColor", 0.8f * clothColor);
-  r.setUniform(program, "intdiffuseColor", 0.4f * clothColor);
+  r.setUniform(program, "extdiffuseColor", 0.8f * blue);
+  r.setUniform(program, "intdiffuseColor", 0.4f * blue);
   r.setUniform(program, "specularColor", 0.6f * white);
   r.setUniform(program, "phongExponent", 20.0f);
-  r.drawTriangles(object);
 
-  // Draw all obstacles
+  // tk_std::cout << "\n  gonna draw ready\n " << std::flush;
+  r.drawTriangles(object);
+  // tk_std::cout << "\n  drew vertex ready\n " << std::flush;
+
+  // Draw edges
+  r.setupWireFrame();
+  // tk_std::cout << "\n  gonna edges ready\n " << std::flush;
+  glm::vec3 black(0.0f, 0.0f, 0.0f);
+  r.setUniform(program, "ambientColor", black);
+  r.setUniform(program, "extdiffuseColor", black);
+  r.setUniform(program, "intdiffuseColor", black);
+  r.setUniform(program, "specularColor", black);
+  r.setUniform(program, "phongExponent", 0.0f);
+  r.drawEdges(object);
+
+  // tk_std::cout << "\n  edges ready\n " << std::flush;
+  //  Draw all obstacles
   for (auto obstacle : obstacles) {
     obstacle->draw(r, program, camera);
   }
+  // tk_std::cout << "\n  obstacle ready\n " << std::flush;
 }
-
-// void ClothSystem::initializeRendering(OpenGL::Rasterizer &r) {
-//   // Create vertex and normal buffers
-//   vertexBuf = r.createAttribBuf(vertices);
-//   normalBuf = r.createAttribBuf(normals);
-
-//   // Create object and set attributes
-//   object = r.createObject();
-//   r.setVertexAttribs(object, vertexBuf);
-//   r.setVertexAttribs(object, normalBuf, 1);
-//   r.setTriangleIndices(object, triangles);
-// }
-
-// void ClothSystem::draw(OpenGL::Rasterizer &r, OpenGL::ShaderProgram &program,
-//                        const Camera &camera) {
-//   // Initialize rendering if not done yet
-//   if (object == 0) {
-//     initializeRendering(r);
-//   }
-
-//   // Update vertex and normal buffers
-//   r.updateAttribBuf(vertexBuf, vertices);
-//   r.updateAttribBuf(normalBuf, normals);
-
-//   // Draw cloth
-//   r.setUniform(program, "objectColor",
-//                glm::vec3(0.7f, 0.7f, 0.9f)); // Cloth color
-//   r.drawObject(object);
-
-//   // Draw all obstacles
-//   for (auto obstacle : obstacles) {
-//     obstacle->draw(r, program, camera);
-//   }
-// }
 
 void ClothSystem::addObstacle(Obstacle *obstacle) {
   if (obstacle) {

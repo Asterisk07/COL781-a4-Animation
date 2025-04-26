@@ -93,6 +93,7 @@ public:
   const ClothConfig &getConfig() const { return config; }
 
 private:
+  bool initialise_flag = false;
   ClothConfig config;
   std::vector<Particle *> particles;
   std::vector<Spring *> springs;
