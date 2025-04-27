@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 project(a4)
 set(CMAKE_CXX_STANDARD 11)
 
+
 find_package(glm REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -36,10 +37,13 @@ target_link_libraries(e4 col781)
 
 
 # AddressSanitizer Flags
-set(SANITIZE_FLAGS "-fsanitize=address")
+# set(SANITIZE_FLAGS "-fsanitize=address")
 
-target_compile_options(col781 PRIVATE ${SANITIZE_FLAGS})
-target_link_options(col781 PRIVATE ${SANITIZE_FLAGS})
+# target_compile_options(col781 PRIVATE ${SANITIZE_FLAGS})
+# target_link_options(col781 PRIVATE ${SANITIZE_FLAGS})
 
-target_compile_options(e2 PRIVATE ${SANITIZE_FLAGS})
-target_link_options(e2 PRIVATE ${SANITIZE_FLAGS})
+# target_compile_options(e2 PRIVATE ${SANITIZE_FLAGS})
+# target_link_options(e2 PRIVATE ${SANITIZE_FLAGS})
+
+# target_compile_options(e1 PRIVATE ${SANITIZE_FLAGS})
+# target_link_options(e1 PRIVATE ${SANITIZE_FLAGS})

@@ -154,9 +154,9 @@ int ClothSystem::getParticleIndex(int i, int j) const {
 }
 
 void ClothSystem::createParticles() {
-  float Y_OFFSET = 0.2f;
+  float Y_OFFSET = 0.0f;
   float Z_OFFSET = -0.0f;
-  float X_OFFSET = -1.0f;
+  float X_OFFSET = -0.0f;
   float dx = config.width / (config.resolutionX - 1);
   float dz = config.height / (config.resolutionY - 1);
 

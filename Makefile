@@ -9,7 +9,7 @@ all:
 	@echo "Example: make 1"
 
 example:
-	@if [ -f "src/example.cpp" ]; then \
+	@if [ -f "executables/example.cpp" ]; then \
 		clear; \
 		if $(MAKE) --no-print-directory --silent -C build example; then \
 			./build/example; \

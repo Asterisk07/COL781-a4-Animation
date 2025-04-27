@@ -199,8 +199,8 @@ bool PlaneObstacle::checkCollision(Particle *particle,
   // Check if particle is on the wrong side of the plane
   if (signedDistance <= 0.0f) {
     normal = this->normal;
-    // penetrationDepth = -signedDistance + 0.001f;
-    penetrationDepth = -signedDistance;
+    penetrationDepth = -signedDistance + 0.01f;
+    // penetrationDepth = -signedDistance;
     collisionPoint = particle->position - normal * penetrationDepth;
     return true;
   }

@@ -1,85 +1,180 @@
-
-#ifndef SKELETAL_HPP // "If SKELETAL_HPP has NOT been defined yet..."
-#define SKELETAL_HPP // "Then define SKELETAL_HPP"
+#pragma once
 
 #include "camera.hpp"
 #include "hw.hpp"
-
-#include <functional>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include <iostream>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
 #include <vector>
 
-namespace GL = COL781::OpenGL;
+namespace Animation {
 
-// namespace Skeleton {
+// Forward declarations
+class Skeleton;
+class Bone;
+class BoxMesh;
+class Keyframe;
+class AnimationTimeline;
 
-struct Bone {
-  Bone *parent;
-  std::vector<Bone *> children;
+// Represents a single bone in the skeletal hierarchy
+class Bone : public std::enable_shared_from_this<Bone> {
+private:
+  std::string m_name;
+  glm::vec3 m_localOffset;  // Offset relative to parent
+  glm::vec3 m_rotationAxis; // Axis around which the bone rotates
+  float m_currentRotation;  // Current rotation angle in radians
 
-  glm::vec3 joint_pos;
-  glm::vec3 axis;
-  float hinge_angle;
+  std::shared_ptr<Bone> m_parent;
+  std::vector<std::shared_ptr<Bone>> m_children;
 
-  glm::mat4 local_transform;
-  glm::mat4 world_transform;
+  glm::mat4 m_localTransform; // Local transform matrix
+  glm::mat4 m_worldTransform; // World transform matrix
 
-  std::vector<glm::vec3> mesh_vertices_local;
-  std::vector<glm::vec3> mesh_normals_local;
+  std::shared_ptr<BoxMesh> m_attachedMesh;
 
-  GL::Object object;
-  GL::AttribBuf vertexBuf, normalBuf;
+public:
+  Bone(const std::string &name, const glm::vec3 &offset,
+       const glm::vec3 &rotAxis);
+
+  void addChild(std::shared_ptr<Bone> child);
+  void attachMesh(std::shared_ptr<BoxMesh> mesh);
+
+  void setRotation(float angle);
+  float getRotation() const;
+
+  const glm::vec3 &getLocalOffset() const;
+  const glm::vec3 &getRotationAxis() const;
+
+  void updateTransforms(const glm::mat4 &parentTransform);
+  const glm::mat4 &getWorldTransform() const;
+
+  std::shared_ptr<Bone> getParent() const;
+  const std::vector<std::shared_ptr<Bone>> &getChildren() const;
+
+  const std::string &getName() const;
+  std::shared_ptr<BoxMesh> getAttachedMesh() const;
 };
 
-struct Joint {
-  Bone *bone;
-  float theta; // editable angle
+// A simple box mesh attached to a bone
+class BoxMesh {
+private:
+  glm::vec3 m_dimensions;
+  glm::vec3 m_color;
+
+  std::vector<glm::vec3> m_vertices;
+  std::vector<glm::vec3> m_normals;
+  std::vector<glm::ivec3> m_triangles;
+  std::vector<glm::ivec2> m_edges;
+
+public:
+  BoxMesh(const glm::vec3 &dimensions, const glm::vec3 &color);
+
+  void generateGeometry();
+
+  const std::vector<glm::vec3> &getVertices() const;
+  const std::vector<glm::vec3> &getNormals() const;
+  const std::vector<glm::ivec3> &getTriangles() const;
+  const std::vector<glm::ivec2> &getEdges() const;
+
+  const glm::vec3 &getColor() const;
 };
 
-Bone *addJoint(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-               glm::vec3 axis, std::vector<Joint> &jointList, float length,
-               float width, float depth);
+// Represents a single frame in an animation
+class Keyframe {
+private:
+  float m_timestamp;
+  glm::vec3 m_rootPosition;
+  std::map<std::string, float> m_boneRotations;
 
-// Optional helper
-void setTheta(Joint &joint, float theta);
-void updateJointHierarchy(Bone *root);
-// Character state
-// std::vector<Bone> bones;
-// Bone *root;
-// glm::vec3 root_pos;
-// glm::quat root_rot; // tk include later
+public:
+  Keyframe(float timestamp, const glm::vec3 &rootPos);
 
-// Animation keyframes
-struct Keyframe {
-  float time;
-  std::vector<float> hinge_angles; // one per bone
+  void setBoneRotation(const std::string &boneName, float rotation);
+  float getBoneRotation(const std::string &boneName) const;
+
+  float getTimestamp() const;
+  const glm::vec3 &getRootPosition() const;
+
+  const std::map<std::string, float> &getAllRotations() const;
 };
 
-// std::vector<Keyframe> keyframes;
+// Complete skeleton made of multiple bones
+class Skeleton {
+private:
+  std::shared_ptr<Bone> m_rootBone;
+  std::map<std::string, std::shared_ptr<Bone>> m_boneMap;
+  glm::vec3 m_position;
 
-// // Called once at startup
-// void initialize(GL::Rasterizer &r);
+public:
+  Skeleton();
 
-// // Called every frame with time `t` (in seconds)
-// void update(float t);
+  void setRootBone(std::shared_ptr<Bone> root);
+  std::shared_ptr<Bone> getRootBone() const;
 
-// // Called every frame to draw
-// void draw(GL::Rasterizer &r, GL::ShaderProgram &program);
-void createBoxMesh(std::vector<glm::vec3> &vertices,
-                   std::vector<glm::vec3> &normals,
-                   std::vector<glm::ivec3> &triangles);
+  void addBone(std::shared_ptr<Bone> bone);
+  std::shared_ptr<Bone> getBoneByName(const std::string &name) const;
 
-// 2. Builder Function: createBone
-Bone *createBone(GL::Rasterizer &r, Bone *parent, glm::vec3 joint_pos,
-                 glm::vec3 axis, float length, float width, float depth);
+  void setPosition(const glm::vec3 &position);
+  const glm::vec3 &getPosition() const;
 
-void updateBoneTransforms(Bone *bone,
-                          const glm::mat4 &parent_transform = glm::mat4(1.0f));
-void updateBoneMesh(GL::Rasterizer &r, Bone *bone);
-void updateAllMeshes(GL::Rasterizer &r, Bone *root);
+  void updateTransforms();
+};
 
-// } // namespace Skeleton
+// Animation timeline managing keyframes and interpolation
+class AnimationTimeline {
+private:
+  std::vector<std::shared_ptr<Keyframe>> m_keyframes;
+  float m_duration;
+  bool m_looping;
 
-#endif
+  // Helper methods for Catmull-Rom interpolation
+  glm::vec3 interpolatePosition(float t, int idx1, int idx2) const;
+  float interpolateRotation(float t, int idx1, int idx2,
+                            const std::string &boneName) const;
+  float estimateDerivative(float p0, float p1, float p2) const;
+  glm::vec3 estimateDerivative(const glm::vec3 &p0, const glm::vec3 &p1,
+                               const glm::vec3 &p2) const;
+
+public:
+  AnimationTimeline();
+
+  void addKeyframe(std::shared_ptr<Keyframe> keyframe);
+  void setLooping(bool loop);
+
+  std::shared_ptr<Keyframe> getKeyframe(int index) const;
+  int getKeyframeCount() const;
+
+  float getDuration() const;
+  bool isLooping() const;
+
+  // Apply interpolated animation to skeleton at time t
+  void applyAnimation(std::shared_ptr<Skeleton> skeleton, float t) const;
+
+  // Find indices and interpolation factor for time t
+  void getKeyframeIndices(float t, int &idx1, int &idx2, float &factor) const;
+};
+
+// Animator class to manage skeletons and animations
+class Animator {
+private:
+  std::shared_ptr<Skeleton> m_skeleton;
+  std::shared_ptr<AnimationTimeline> m_animation;
+  float m_currentTime;
+
+public:
+  Animator();
+
+  void setSkeleton(std::shared_ptr<Skeleton> skeleton);
+  std::shared_ptr<Skeleton> getSkeleton() const;
+
+  void setAnimation(std::shared_ptr<AnimationTimeline> animation);
+  std::shared_ptr<AnimationTimeline> getAnimation() const;
+
+  void update(float deltaTime);
+  float getCurrentTime() const;
+};
+
+} // namespace Animation
