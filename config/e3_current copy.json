@@ -1,0 +1,18 @@
+{
+    "timeStep": 0.001,
+    "width": 1.0,
+    "height": 1.0,
+    "resolutionX": 20,
+    "resolutionY": 20,
+    "particleMass": 0.1,
+    "kStructural": 1000.0,
+    "kShear": 1000.0,
+    "kBending": 500.0,
+    "dStructural": 10.0,
+    "dShear": 10.0,
+    "dBending": 5.0,
+    "gravity": 19.8,
+    "restitution": 0.3,
+    "friction": 0.4,
+    "fixedCorners": [0, 1]
+  }

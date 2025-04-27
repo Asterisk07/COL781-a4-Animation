@@ -154,6 +154,9 @@ int ClothSystem::getParticleIndex(int i, int j) const {
 }
 
 void ClothSystem::createParticles() {
+  float Y_OFFSET = 0.2f;
+  float Z_OFFSET = -0.0f;
+  float X_OFFSET = -1.0f;
   float dx = config.width / (config.resolutionX - 1);
   float dz = config.height / (config.resolutionY - 1);
 
@@ -161,9 +164,9 @@ void ClothSystem::createParticles() {
   for (int i = 0; i < config.resolutionY; ++i) {
     for (int j = 0; j < config.resolutionX; ++j) {
       // Calculate position (initially horizontal sheet in XZ plane)
-      float x = j * dx;
-      float y = 0.0f; // Initially flat horizontal cloth
-      float z = i * dz;
+      float x = j * dx + X_OFFSET;
+      float y = 0.0f + Y_OFFSET; // Initially flat horizontal cloth
+      float z = i * dz + Z_OFFSET;
 
       // Check if this particle should be fixed
       bool isFixed = false;

@@ -1,4 +1,3 @@
-#include "obstacle.hpp"
 #include "spring.hpp"
 #include <fstream>
 #include <iostream>
@@ -12,8 +11,7 @@ using json = nlohmann::json;
 #include <stdexcept>
 
 // Config file path
-const std::string CONFIG_FILE = "config/e3_current.json";
-// const std::string CONFIG_FILE = "config/config_current.json";
+const std::string CONFIG_FILE = "config/config_current.json";
 
 GL::Rasterizer r;
 GL::ShaderProgram program;
@@ -24,9 +22,6 @@ ClothSystem *cloth = nullptr;
 float simulationTime = 0.0f;
 float timeStep = 10.0f; // Default value, will be overridden
 bool paused = false;
-
-// Global container for obstacles
-std::vector<Obstacle *> obstacles;
 
 // Load cloth configuration from a JSON file
 ClothSystem::ClothConfig loadClothConfig(const std::string &configFile) {
@@ -70,10 +65,6 @@ ClothSystem::ClothConfig loadClothConfig(const std::string &configFile) {
       // Load gravity
       config.gravity = j.at("gravity").get<float>();
 
-      // Load collision parameters (with defaults if not specified)
-      config.restitution = j.value("restitution", 0.5f);
-      config.friction = j.value("friction", 0.3f);
-
       // Load fixed corners
       config.fixedCorners = j.at("fixedCorners").get<std::vector<int>>();
 
@@ -109,83 +100,16 @@ ClothSystem::ClothConfig loadClothConfig(const std::string &configFile) {
   return config;
 }
 
-// Initialize obstacles in the scene
-void initializeObstacles() {
-  // Clear existing obstacles
-  for (auto obstacle : obstacles) {
-    delete obstacle;
-  }
-  obstacles.clear();
-
-  // glm::vec3 pos1 = glm::vec3(0.2f, -0.80f, 0.0f);
-
-  glm::vec3 pos1 = glm::vec3(0.4f, -0.70f, 0.0f);
-  glm::vec3 pos2 = glm::vec3(0.8f, -0.80f, 0.2f);
-
-  // Create ground plane
-  PlaneObstacle *ground =
-      new PlaneObstacle(glm::vec3(0.0f, -0.8f, 0.0f), // Position
-                        glm::vec3(0.0f, 1.0f, 0.0f),  // Normal
-                        20.0f                         // Size
-      );
-  obstacles.push_back(ground);
-
-  // Create a stationary sphere
-
-  SphereObstacle *sphere1 =
-      new SphereObstacle(pos1,            // Center
-                         0.2f,            // Visual radius
-                         glm::vec3(0.0f), // No linear velocity
-                         glm::vec3(0.0f), // No angular velocity
-                         0.23f            // Collision radius (slightly larger)
-      );
-  obstacles.push_back(sphere1);
-
-  // Create a moving sphere (linear motion)
-  // SphereObstacle *sphere2 =
-  //     new SphereObstacle(glm::vec3(0.5f, -0.8f, 0.0f), // Initial center
-  //                        0.15f,                        // Visual radius
-  //                        glm::vec3(0.0f, 1.7f, 0.0f),  // Linear velocity
-  //                        glm::vec3(0.0f),              // No angular velocity
-  //                        0.16f                         // Collision radius
-  //     );
-  // obstacles.push_back(sphere2);
-
-  // Create a rotating sphere
-  // SphereObstacle *sphere3 = new SphereObstacle(
-  //     pos2,            // Center
-  //     0.18f,           // Visual radius
-  //     glm::vec3(0.0f), // No linear velocity
-  //     glm::vec3(0.0f, 0.4f,
-  //               0.0f), // Angular velocity (rotation aroundY-axis)
-  //     0.19f            //
-  //                      // Collision radius
-  // );
-  // obstacles.push_back(sphere3);
-}
-
 void initializeScene() {
   // Load the cloth simulation parameters from config file
   ClothSystem::ClothConfig config = loadClothConfig(CONFIG_FILE);
 
   // Create cloth system with loaded configuration
   cloth = new ClothSystem(config);
-
-  // Initialize obstacles
-  initializeObstacles();
-
-  // Add obstacles to cloth system
-  for (auto obstacle : obstacles) {
-    cloth->addObstacle(obstacle);
-  }
 }
 
 void updateScene(float t) {
   if (!paused) {
-    // Update all obstacles
-    for (auto obstacle : obstacles) {
-      obstacle->update(timeStep);
-    }
 
     // Perform multiple mini-steps for better stability
     for (int i = 0; i < 10; ++i) {
@@ -207,11 +131,6 @@ void handleInput() {
       case SDLK_r:
         // Reset simulation
         cloth->reset();
-        initializeObstacles(); // Reset obstacles too
-        // Re-add obstacles to cloth system
-        for (auto obstacle : obstacles) {
-          cloth->addObstacle(obstacle);
-        }
         simulationTime = 0.0f;
         break;
       case SDLK_ESCAPE:
@@ -225,7 +144,7 @@ void handleInput() {
 
 int main() {
   int width = 800, height = 600;
-  if (!r.initialize("Cloth Simulation with Collisions", width, height)) {
+  if (!r.initialize("Cloth Simulation", width, height)) {
     return EXIT_FAILURE;
   }
 
@@ -239,7 +158,6 @@ int main() {
 
   // Initialize scene
   initializeScene();
-  std::cout << "\n  Scene ready\n " << std::flush;
 
   // Main loop
   while (!r.shouldQuit()) {
@@ -250,20 +168,14 @@ int main() {
     float t = SDL_GetTicks64() * 1e-3;
     updateScene(t);
 
-    // std::cout << "\n  update ready\n " << std::flush;
-
     // Update camera
     camCtl.update();
     Camera &camera = camCtl.camera;
-
-    // std::cout << "\n  camera ready\n " << std::flush;
 
     // Clear screen
     r.clear(vec4(0.4f, 0.4f, 0.4f, 1.0f));
     r.enableDepthTest();
     r.useShaderProgram(program);
-
-    // std::cout << "\n  shader ready\n " << std::flush;
 
     // Set common shader uniforms
     r.setUniform(program, "model", mat4(1.0f));
@@ -273,11 +185,8 @@ int main() {
     r.setUniform(program, "viewPos", camera.position);
     r.setUniform(program, "lightColor", vec3(1.0f, 1.0f, 1.0f));
 
-    // std::cout << "\n  gonna drwa ready\n " << std::flush;
-    // Draw the cloth (which also draws all the obstacles)
+    // Draw the cloth
     cloth->draw(r, program, camera);
-
-    // std::cout << "\n  draw ready\n " << std::flush;
 
     // Display simulation info
     std::cout << "\rSimulation time: " << simulationTime << " seconds"
@@ -288,22 +197,7 @@ int main() {
   }
 
   // Clean up
-  std::cout << "\n\n Ending simulation " << std::flush;
-  // delete cloth;
-  if (cloth) {
-    delete cloth;
-    cloth = nullptr;
-  }
-  for (auto obstacle : obstacles) {
-    delete obstacle;
-  }
-
-  obstacles.clear();
-
-  // Cleanup SDL resources
-  // r.clear();
-  // Clean up resources before exiting
-  // cleanupResources();
+  delete cloth;
 
   return 0;
 }

@@ -117,51 +117,47 @@ void initializeObstacles() {
   }
   obstacles.clear();
 
-  // glm::vec3 pos1 = glm::vec3(0.2f, -0.80f, 0.0f);
-
-  glm::vec3 pos1 = glm::vec3(0.4f, -0.70f, 0.0f);
-  glm::vec3 pos2 = glm::vec3(0.8f, -0.80f, 0.2f);
-
   // Create ground plane
-  PlaneObstacle *ground =
-      new PlaneObstacle(glm::vec3(0.0f, -0.8f, 0.0f), // Position
-                        glm::vec3(0.0f, 1.0f, 0.0f),  // Normal
-                        20.0f                         // Size
-      );
-  obstacles.push_back(ground);
+  // PlaneObstacle *ground =
+  //     new PlaneObstacle(glm::vec3(0.0f, -0.5f, 0.0f), // Position
+  //                       glm::vec3(0.0f, 1.0f, 0.0f),  // Normal
+  //                       20.0f                         // Size
+  //     );
+  // obstacles.push_back(ground);
 
-  // Create a stationary sphere
+  // // Create a stationary sphere
+  // glm::vec3 pos1 = glm::vec3(0.2f, -0.80f, 0.0f);
+  // SphereObstacle *sphere1 =
+  //     new SphereObstacle(pos1,            // Center
+  //                        0.2f,            // Visual radius
+  //                        glm::vec3(0.0f), // No linear velocity
+  //                        glm::vec3(0.0f), // No angular velocity
+  //                        0.21f            // Collision radius (slightly
+  //                        larger)
+  //     );
+  // obstacles.push_back(sphere1);
 
-  SphereObstacle *sphere1 =
-      new SphereObstacle(pos1,            // Center
-                         0.2f,            // Visual radius
-                         glm::vec3(0.0f), // No linear velocity
-                         glm::vec3(0.0f), // No angular velocity
-                         0.23f            // Collision radius (slightly larger)
-      );
-  obstacles.push_back(sphere1);
+  glm::vec3 pos2 = glm::vec3(0.8f, -0.80f, 0.0f);
 
-  // Create a moving sphere (linear motion)
+  // // Create a moving sphere (linear motion)
   // SphereObstacle *sphere2 =
-  //     new SphereObstacle(glm::vec3(0.5f, -0.8f, 0.0f), // Initial center
+  //     new SphereObstacle(glm::vec3(0.5f, 0.1f, 0.3f),  // Initial center
   //                        0.15f,                        // Visual radius
-  //                        glm::vec3(0.0f, 1.7f, 0.0f),  // Linear velocity
+  //                        glm::vec3(-0.2f, 0.0f, 0.0f), // Linear velocity
   //                        glm::vec3(0.0f),              // No angular velocity
   //                        0.16f                         // Collision radius
   //     );
   // obstacles.push_back(sphere2);
 
-  // Create a rotating sphere
-  // SphereObstacle *sphere3 = new SphereObstacle(
-  //     pos2,            // Center
-  //     0.18f,           // Visual radius
-  //     glm::vec3(0.0f), // No linear velocity
-  //     glm::vec3(0.0f, 0.4f,
-  //               0.0f), // Angular velocity (rotation aroundY-axis)
-  //     0.19f            //
-  //                      // Collision radius
-  // );
-  // obstacles.push_back(sphere3);
+  // // Create a rotating sphere
+  SphereObstacle *sphere3 = new SphereObstacle(
+      pos2,                        // Center
+      0.18f,                       // Visual radius
+      glm::vec3(0.0f),             // No linear velocity
+      glm::vec3(0.0f, 0.4f, 0.0f), // Angular velocity (rotation aroundY-axis)
+      0.19f                        // Collision radius
+  );
+  obstacles.push_back(sphere3);
 }
 
 void initializeScene() {

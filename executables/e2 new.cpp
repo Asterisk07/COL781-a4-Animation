@@ -117,49 +117,41 @@ void initializeObstacles() {
   }
   obstacles.clear();
 
-  // glm::vec3 pos1 = glm::vec3(0.2f, -0.80f, 0.0f);
-
-  glm::vec3 pos1 = glm::vec3(0.4f, -0.70f, 0.0f);
-  glm::vec3 pos2 = glm::vec3(0.8f, -0.80f, 0.2f);
-
   // Create ground plane
-  PlaneObstacle *ground =
-      new PlaneObstacle(glm::vec3(0.0f, -0.8f, 0.0f), // Position
-                        glm::vec3(0.0f, 1.0f, 0.0f),  // Normal
-                        20.0f                         // Size
-      );
-  obstacles.push_back(ground);
+  // PlaneObstacle *ground =
+  //     new PlaneObstacle(glm::vec3(0.0f, -0.5f, 0.0f), // Position
+  //                       glm::vec3(0.0f, 1.0f, 0.0f),  // Normal
+  //                       20.0f                         // Size
+  //     );
+  // obstacles.push_back(ground);
 
-  // Create a stationary sphere
+  // // Create a stationary sphere
+  // SphereObstacle *sphere1 =
+  //     new SphereObstacle(glm::vec3(-0.2f, 0.0f, 0.0f), // Center
+  //                        0.2f,                         // Visual radius
+  //                        glm::vec3(0.0f),              // No linear velocity
+  //                        glm::vec3(0.0f),              // No angular velocity
+  //                        0.21f // Collision radius (slightly larger)
+  //     );
+  // obstacles.push_back(sphere1);
 
-  SphereObstacle *sphere1 =
-      new SphereObstacle(pos1,            // Center
-                         0.2f,            // Visual radius
-                         glm::vec3(0.0f), // No linear velocity
-                         glm::vec3(0.0f), // No angular velocity
-                         0.23f            // Collision radius (slightly larger)
-      );
-  obstacles.push_back(sphere1);
-
-  // Create a moving sphere (linear motion)
+  // // Create a moving sphere (linear motion)
   // SphereObstacle *sphere2 =
-  //     new SphereObstacle(glm::vec3(0.5f, -0.8f, 0.0f), // Initial center
+  //     new SphereObstacle(glm::vec3(0.5f, 0.1f, 0.3f),  // Initial center
   //                        0.15f,                        // Visual radius
-  //                        glm::vec3(0.0f, 1.7f, 0.0f),  // Linear velocity
+  //                        glm::vec3(-0.2f, 0.0f, 0.0f), // Linear velocity
   //                        glm::vec3(0.0f),              // No angular velocity
   //                        0.16f                         // Collision radius
   //     );
   // obstacles.push_back(sphere2);
 
-  // Create a rotating sphere
+  // // Create a rotating sphere
   // SphereObstacle *sphere3 = new SphereObstacle(
-  //     pos2,            // Center
-  //     0.18f,           // Visual radius
-  //     glm::vec3(0.0f), // No linear velocity
-  //     glm::vec3(0.0f, 0.4f,
-  //               0.0f), // Angular velocity (rotation aroundY-axis)
-  //     0.19f            //
-  //                      // Collision radius
+  //     glm::vec3(0.0f, 0.0f, 0.5f), // Center
+  //     0.18f,                       // Visual radius
+  //     glm::vec3(0.0f),             // No linear velocity
+  //     glm::vec3(0.0f, 1.0f, 0.0f), // Angular velocity (rotation around
+  //     Y-axis) 0.19f                        // Collision radius
   // );
   // obstacles.push_back(sphere3);
 }
@@ -239,7 +231,6 @@ int main() {
 
   // Initialize scene
   initializeScene();
-  std::cout << "\n  Scene ready\n " << std::flush;
 
   // Main loop
   while (!r.shouldQuit()) {
@@ -250,20 +241,14 @@ int main() {
     float t = SDL_GetTicks64() * 1e-3;
     updateScene(t);
 
-    // std::cout << "\n  update ready\n " << std::flush;
-
     // Update camera
     camCtl.update();
     Camera &camera = camCtl.camera;
-
-    // std::cout << "\n  camera ready\n " << std::flush;
 
     // Clear screen
     r.clear(vec4(0.4f, 0.4f, 0.4f, 1.0f));
     r.enableDepthTest();
     r.useShaderProgram(program);
-
-    // std::cout << "\n  shader ready\n " << std::flush;
 
     // Set common shader uniforms
     r.setUniform(program, "model", mat4(1.0f));
@@ -273,11 +258,8 @@ int main() {
     r.setUniform(program, "viewPos", camera.position);
     r.setUniform(program, "lightColor", vec3(1.0f, 1.0f, 1.0f));
 
-    // std::cout << "\n  gonna drwa ready\n " << std::flush;
     // Draw the cloth (which also draws all the obstacles)
     cloth->draw(r, program, camera);
-
-    // std::cout << "\n  draw ready\n " << std::flush;
 
     // Display simulation info
     std::cout << "\rSimulation time: " << simulationTime << " seconds"
@@ -288,22 +270,10 @@ int main() {
   }
 
   // Clean up
-  std::cout << "\n\n Ending simulation " << std::flush;
-  // delete cloth;
-  if (cloth) {
-    delete cloth;
-    cloth = nullptr;
-  }
+  delete cloth;
   for (auto obstacle : obstacles) {
     delete obstacle;
   }
-
-  obstacles.clear();
-
-  // Cleanup SDL resources
-  // r.clear();
-  // Clean up resources before exiting
-  // cleanupResources();
 
   return 0;
 }
